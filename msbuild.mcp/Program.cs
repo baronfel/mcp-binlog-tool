@@ -26,6 +26,14 @@ public class MSBuildTool
         return tfms ?? (tf is not null ? new[] { tf } : Array.Empty<string>());
     }
 
+    [McpTool("list-project-dependencies"), Description("Returns the project dependencies of a project")]
+    /// <param name="projectPath">The path to the project file to read</param>
+    public string[] ListProjectDependencies(string projectPath)
+    {
+        var project = TryLoadProject(projectPath);
+        return project.GetItems("ProjectReference").Select(i => i.EvaluatedInclude).ToArray();
+    }
+
     Project TryLoadProject(string projectPath)
     {
         var key = new ProjectKey(projectPath, null);
