@@ -1,11 +1,14 @@
-﻿using MCPSharp;
+﻿using System.ComponentModel;
+using McpDotNet;
+using McpDotNet.Server;
 using Microsoft.Build.Evaluation;
 using Microsoft.Build.Locator;
+using Microsoft.Extensions.Hosting;
+using Serilog;
 
 namespace MSBuild.MCP;
 
-
-[McpTool("msbuild", "MSBuild tool")]
+[McpToolType]
 public class MSBuildTool
 {
     public struct ProjectKey(string path, (string, string)[]? properties);
@@ -13,8 +16,9 @@ public class MSBuildTool
     public Dictionary<ProjectKey, Project> loadedProjects = new();
     public ProjectCollection projectCollection = new();
 
-    [McpTool("list-target-frameworks", "Returns the target frameworks of a project")]
-    public string[] ListTargetFrameworks([McpParameter(required: true, description: "The path to the project to inspect")] string projectPath)
+    [McpTool("list-target-frameworks"), Description("Returns the target frameworks of a project")]
+    /// <param name="projectPath">The path to the project file to read</param>
+    public string[] ListTargetFrameworks(string projectPath)
     {
         var project = TryLoadProject(projectPath);
         var tfms = project.GetProperty("TargetFrameworks")?.EvaluatedValue.Split(';');
@@ -46,6 +50,22 @@ public static class Program
     static async Task Main(string[] args)
     {
         RegisterMSBuild();
-        await MCPServer.StartAsync("msbuild-server", "1.0.0");
+
+        Log.Logger = new LoggerConfiguration()
+           .MinimumLevel.Verbose() // Capture all log levels
+           .WriteTo.File(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs", "TestServer_.log"),
+               rollingInterval: RollingInterval.Day,
+               outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+           .WriteTo.Debug()
+           .WriteTo.Console(standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
+           .CreateLogger();
+
+        var builder = Host.CreateApplicationBuilder(args);
+        builder.Services.AddSerilog();
+        builder.Services
+            .AddMcpServer()
+            .WithStdioServerTransport()
+            .WithTools();
+        await builder.Build().RunAsync();
     }
 }
