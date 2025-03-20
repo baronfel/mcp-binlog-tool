@@ -62,7 +62,7 @@ public static class Prompts
 
     public static Prompt UpgradeAllProjectsPrompt = new()
     {
-        Name = "upgrade-all-project",
+        Name = "upgrade-all-projects",
         Description = "Upgrade a project to the given target framework",
         Arguments = new() {
             new PromptArgument<string[]>(){
@@ -95,7 +95,7 @@ public static class Prompts
             {
                 Description = "Upgrade the selected projects to the given target framework",
                 Messages = new() {
-                    new (){ Role = Role.User, Content = new TextContent(
+                    new (){ Content = new TextContent(
                         $"""
                         Update the projects at {string.Join(", ", req.Arguments!["projects"])} to target framework {req.Arguments!["targetFramework"]}.
                         Make me a plan to update the target frameworks for these projects.
