@@ -6,8 +6,17 @@ using Microsoft.Build.Evaluation;
 using Microsoft.Build.Locator;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using NuGet.Protocol;
+using NuGet.Credentials;
+using NuGet.Configuration;
+using NuGet.Protocol.Core.Types;
+using System.Collections.Concurrent;
+using NuGet.Versioning;
+using System.Threading.Tasks;
 
 namespace MSBuild.MCP;
+
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
 public static class Prompts
 {
@@ -111,42 +120,128 @@ public static class Prompts
     }
 }
 
+
+public class PackageReference(string Name, string Version);
+
 [McpToolType]
 public class MSBuildTool
 {
     public struct ProjectKey(string path, (string, string)[]? properties);
 
-    public Dictionary<ProjectKey, Project> loadedProjects = new();
-    public ProjectCollection projectCollection = new();
-
-    [McpTool("list-target-frameworks"), Description("Returns the target frameworks of a project")]
-    /// <param name="projectPath">The path to the project file to read</param>
-    public string[] ListTargetFrameworks(string projectPath)
+    private readonly SourceCacheContext _cacheSettings = new()
     {
-        var project = TryLoadProject(projectPath);
+        NoCache = false,
+        DirectDownload = true,
+        IgnoreFailedSources = true,
+    };
+
+    private readonly ConcurrentDictionary<PackageSource, SourceRepository> _sourceRepositories = new();
+    private readonly Dictionary<ProjectKey, Project> loadedProjects = new();
+
+    private readonly ProjectCollection projectCollection = new(new Dictionary<string, string>()
+    {
+        // todo: add any required msbuild global properties here
+        // in real-life would likely need to be highly variable, and we might need _multiple_ project collections
+        // for different projects with different global properties
+    });
+
+    /// <param name="projectPath">The path to the project file to read</param>
+    /// <param name="cancellationToken"></param>
+    [McpTool("list-target-frameworks"), Description("Returns the target frameworks of a project")]
+    public async Task<string[]> ListTargetFrameworks(string projectPath, CancellationToken cancellationToken)
+    {
+        var project = await TryLoadProject(projectPath, cancellationToken);
         var tfms = project.GetProperty("TargetFrameworks")?.EvaluatedValue.Split(';');
         var tf = project.GetProperty("TargetFramework")?.EvaluatedValue;
         return tfms ?? (tf is not null ? new[] { tf } : Array.Empty<string>());
     }
 
-    [McpTool("list-project-dependencies"), Description("Returns the project dependencies of a project")]
     /// <param name="projectPath">The path to the project file to read</param>
-    public string[] ListProjectDependencies(string projectPath)
+    /// <param name="cancellationToken"></param>
+    [McpTool("list-project-dependencies"), Description("Returns the project dependencies of a project")]
+    public async Task<string[]> ListProjectDependencies(string projectPath, CancellationToken cancellationToken)
     {
-        var project = TryLoadProject(projectPath);
+        var project = await TryLoadProject(projectPath, cancellationToken);
         return project.GetItems("ProjectReference").Select(i => i.EvaluatedInclude).ToArray();
     }
 
-    [McpTool("list-package-references"), Description("Returns the package references of a project")]
     /// <param name="projectPath">The path to the project file to read</param>
-    public string[] ListPackageReferences(string projectPath)
+    /// <param name="cancellationToken"></param>
+    [McpTool("list-package-references"), Description("Returns the package references of a project")]
+    public async Task<string[]> ListPackageReferences(string projectPath, CancellationToken cancellationToken)
     {
-        var project = TryLoadProject(projectPath);
-        return project.GetItems("PackageReference").Select(i => i.EvaluatedInclude).ToArray();
+        var project = await TryLoadProject(projectPath, cancellationToken);
+        return project.GetItems("PackageReference").Select(i => $"Package {i.EvaluatedInclude}, version {i.GetMetadataValue("Version")}").ToArray();
     }
 
+    /// <param name="packageName">The name of the package to get versions for</param>
+    /// <param name="cancellationToken"></param>
+    [McpTool("get-package-versions"), Description("Returns the versions of a package available from the configured package sources")]
+    public async Task<string[]> GetPackageVersions(string packageName, CancellationToken cancellationToken)
+    {
 
-    Project TryLoadProject(string projectPath)
+        ISettings settings;
+        try
+        {
+            settings = Settings.LoadDefaultSettings(Environment.CurrentDirectory); //TODO: when mcpdotnet supports roots, we should search from the registered roots
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+        var sourceProvider = new PackageSourceProvider(settings);
+        var packageSources = sourceProvider.LoadPackageSources().Where(s => s.IsEnabled).ToDictionary(s => s.Name);
+        var mapping = PackageSourceMapping.GetPackageSourceMapping(settings);
+        var validSources = mapping.IsEnabled ? mapping.GetConfiguredPackageSources(packageName).Select(sourceName => packageSources[sourceName]) : packageSources.Values;
+        var autoCompletes = await Task.WhenAll(validSources.Select(async (source) => await GetAutocompleteAsync(source, cancellationToken).ConfigureAwait(false))).ConfigureAwait(false);
+        // filter down to autocomplete endpoints (not all sources support this)
+        var validAutoCompletes = autoCompletes.SelectMany(x => x);
+        // get versions valid for this source
+        var versionTasks = validAutoCompletes.Select(autocomplete => GetPackageVersionsForSource(autocomplete, packageName, cancellationToken)).ToArray();
+        var versions = await Task.WhenAll(versionTasks).ConfigureAwait(false);
+        // sources may have the same versions, so we have to dedupe.
+        return versions.SelectMany(v => v).Distinct().OrderDescending().Select(x => x.ToString()).ToArray();
+    }
+
+    private SourceRepository GetSourceRepository(PackageSource source)
+    {
+        if (!_sourceRepositories.TryGetValue(source, out SourceRepository? value))
+        {
+            value = Repository.Factory.GetCoreV3(source);
+            _sourceRepositories.AddOrUpdate(source, _ => value, (_, _) => value);
+        }
+
+        return value;
+    }
+
+    private async Task<IEnumerable<AutoCompleteResource>> GetAutocompleteAsync(PackageSource source, CancellationToken cancellationToken)
+    {
+        SourceRepository repository = GetSourceRepository(source);
+        if (await repository.GetResourceAsync<AutoCompleteResource>(cancellationToken).ConfigureAwait(false) is var resource)
+        {
+            return [resource];
+        }
+        else return Enumerable.Empty<AutoCompleteResource>();
+    }
+
+    private async Task<IEnumerable<NuGetVersion>> GetPackageVersionsForSource(AutoCompleteResource autocomplete, string packageId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // we use the NullLogger because we don't want to log to stdout for completions - they interfere with the completions mechanism of the shell program.
+            return await autocomplete.VersionStartsWith(packageId.ToString(), versionPrefix: "", includePrerelease: true, sourceCacheContext: _cacheSettings, log: NuGet.Common.NullLogger.Instance, token: cancellationToken);
+        }
+        catch (FatalProtocolException)  // this most often means that the source didn't actually have a SearchAutocompleteService
+        {
+            return Enumerable.Empty<NuGetVersion>();
+        }
+        catch (Exception) // any errors (i.e. auth) should just be ignored for completions
+        {
+            return Enumerable.Empty<NuGetVersion>();
+        }
+    }
+
+    async Task<Project> TryLoadProject(string projectPath, CancellationToken cancellationToken)
     {
         var key = new ProjectKey(projectPath, null);
         if (loadedProjects.TryGetValue(key, out var project))
@@ -154,9 +249,12 @@ public class MSBuildTool
             return project;
         }
 
-        project = projectCollection!.LoadProject(Path.IsPathFullyQualified(projectPath) ? projectPath : Path.Combine(Environment.CurrentDirectory, projectPath));
-        loadedProjects[key] = project;
-        return project;
+        return await Task.Run(() =>
+        {
+            project = projectCollection!.LoadProject(Path.IsPathFullyQualified(projectPath) ? projectPath : Path.Combine(Environment.CurrentDirectory, projectPath));
+            loadedProjects[key] = project;
+            return project;
+        }, cancellationToken);
     }
 }
 
@@ -164,12 +262,15 @@ public static class Program
 {
     static void RegisterMSBuild()
     {
+        // in a different method to avoid JITing any MSBuild types until after this registration.
         MSBuildLocator.RegisterDefaults();
     }
 
     static async Task Main(string[] args)
     {
         RegisterMSBuild();
+
+        DefaultCredentialServiceUtility.SetupDefaultCredentialService(NuGet.Common.NullLogger.Instance, true);
 
         Log.Logger = new LoggerConfiguration()
            .MinimumLevel.Verbose() // Capture all log levels
