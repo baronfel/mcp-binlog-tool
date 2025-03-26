@@ -1,7 +1,5 @@
 ﻿using System.ComponentModel;
-using McpDotNet;
-using McpDotNet.Protocol.Types;
-using McpDotNet.Server;
+using ModelContextProtocol;
 using Microsoft.Build.Evaluation;
 using Microsoft.Build.Locator;
 using Microsoft.Extensions.Hosting;
@@ -13,6 +11,8 @@ using NuGet.Protocol.Core.Types;
 using System.Collections.Concurrent;
 using NuGet.Versioning;
 using System.Threading.Tasks;
+using ModelContextProtocol.Protocol.Types;
+using ModelContextProtocol.Server;
 
 namespace MSBuild.MCP;
 
@@ -96,6 +96,7 @@ public static class Prompts
             "upgrade-project" => new GetPromptResult()
             {
                 Description = "Upgrade a project to the given target framework",
+
                 Messages = new() {
                     new (){ Role = Role.User, Content = new TextContent($"Update the project at {req.Arguments!["projectPath"]} to target framework {req.Arguments!["targetFramework"]}")},
                  }
@@ -123,7 +124,7 @@ public static class Prompts
 
 public class PackageReference(string Name, string Version);
 
-[McpToolType]
+[McpServerToolType]
 public class MSBuildTool
 {
     public struct ProjectKey(string path, (string, string)[]? properties);
@@ -147,7 +148,7 @@ public class MSBuildTool
 
     /// <param name="projectPath">The path to the project file to read</param>
     /// <param name="cancellationToken"></param>
-    [McpTool("list-target-frameworks"), Description("Returns the target frameworks of a project")]
+    [McpServerTool("list-target-frameworks"), Description("Returns the target frameworks of a project")]
     public async Task<string[]> ListTargetFrameworks(string projectPath, CancellationToken cancellationToken)
     {
         var project = await TryLoadProject(projectPath, cancellationToken);
@@ -158,7 +159,7 @@ public class MSBuildTool
 
     /// <param name="projectPath">The path to the project file to read</param>
     /// <param name="cancellationToken"></param>
-    [McpTool("list-project-dependencies"), Description("Returns the project dependencies of a project")]
+    [McpServerTool("list-project-dependencies"), Description("Returns the project dependencies of a project")]
     public async Task<string[]> ListProjectDependencies(string projectPath, CancellationToken cancellationToken)
     {
         var project = await TryLoadProject(projectPath, cancellationToken);
@@ -167,7 +168,7 @@ public class MSBuildTool
 
     /// <param name="projectPath">The path to the project file to read</param>
     /// <param name="cancellationToken"></param>
-    [McpTool("list-package-references"), Description("Returns the package references of a project")]
+    [McpServerTool("list-package-references"), Description("Returns the package references of a project")]
     public async Task<string[]> ListPackageReferences(string projectPath, CancellationToken cancellationToken)
     {
         var project = await TryLoadProject(projectPath, cancellationToken);
@@ -176,7 +177,7 @@ public class MSBuildTool
 
     /// <param name="packageName">The name of the package to get versions for</param>
     /// <param name="cancellationToken"></param>
-    [McpTool("get-package-versions"), Description("Returns the versions of a package available from the configured package sources")]
+    [McpServerTool("get-package-versions"), Description("Returns the versions of a package available from the configured package sources")]
     public async Task<string[]> GetPackageVersions(string packageName, CancellationToken cancellationToken)
     {
 

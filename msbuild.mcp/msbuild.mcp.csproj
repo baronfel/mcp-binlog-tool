@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="mcpdotnet" Version="1.1.0.1" />
+    <ProjectReference Include="../csharp-sdk/src/ModelContextProtocol/ModelContextProtocol.csproj" />
     <PackageReference Include="Microsoft.Build" Version="17.13.8" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.Build.Locator" Version="1.7.8" />
     <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.13.8" ExcludeAssets="runtime" />
