@@ -1,6 +1,6 @@
-# MSBuild MCP Demo
+# Binlog MCP Server
 
-This is a simple demo of a Model Context Protocol Server (MCP) that exposes tools and prompts for analyzing MSBuild projects to any MCP server.
+This is a simple demo of a Model Context Protocol Server (MCP) that exposes tools and prompts for analyzing MSBuild binlogs to any MCP server.
 
 To configure this:
 
@@ -19,7 +19,7 @@ npx @modelcontextprotocol/inspector ./bin/Debug/net9.0/msbuild.mcp
 {
   "mcpServers": {
     "msbuild": {
-      "command": "<your repo root>\\msbuild.mcp\\bin\\Debug\\net9.0\\msbuild.mcp.exe"
+      "command": "<your repo root>\\binlog.mcp\\bin\\Debug\\net9.0\\binlog.mcp.exe"
     }
   }
 }
@@ -41,7 +41,7 @@ otherwise, you can configure the server directly:
         "inputs": [],
         "servers": {
             "msbuild": {
-                "command": "<repo root>\\msbuild.mcp\\bin\\Debug\\net9.0\\msbuild.mcp.exe",
+                "command": "<repo root>\\binlog.mcp\\bin\\Debug\\net9.0\\binlog.mcp.exe",
                 "args": [],
                 "env": {}
             }
