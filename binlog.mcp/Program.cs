@@ -78,6 +78,20 @@ public class BinlogTool
             .ToList();
     }
 
+    [McpServerTool(Name = "get_evaluation_global_properties"), Description("Get the global properties for a specific evaluation in the loaded binary log file. You can use the `list_evaluations` command to find the evaluation IDs. Global properties are what make evaluations distinct from one another within the same project.")]
+    public static List<string> GetGlobalPropertiesForEvaluation(int evaluationId)
+    {
+        if (build == null) return new List<string>();
+        var globalProperties = build.EvaluationFolder.FindChildrenRecursive<ProjectEvaluation>()
+            .FirstOrDefault(e => e.Id == evaluationId)
+            ?.FindChild<Folder>("Properties")
+            ?.FindChild<Folder>("Global");
+        if (globalProperties == null) return new List<string>();
+        return globalProperties.Children.OfType<Property>()
+            .Select(p => $"{p.Name} = {p.Value}")
+            .ToList();
+    }
+
     private static string CreateProperties(IDictionary<string, string> properties)
     {
         if (properties == null) return string.Empty;
