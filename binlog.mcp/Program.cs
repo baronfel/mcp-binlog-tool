@@ -26,11 +26,39 @@ public class BinlogTool
         }
     }
 
-    [McpServerTool(Name = "list_targets"), Description("List all targets called for each project and their times in the loaded binary log file")]
-    public static List<string> ListTargets()
+    [McpServerTool(Name = "get_expensive_targets"), Description("Get the N most expensive targets in the loaded binary log file")]
+    public static List<string> GetExpensiveTargets(int top_number)
     {
         if (build == null) return new List<string>();
-        return build.FindChildrenRecursive<Microsoft.Build.Logging.StructuredLogger.Target>().Select(t => $"{t.Name} ({t.Duration.Milliseconds} ms) for project {Path.GetFileName(t.Project?.ProjectFile)} with id {t.Project?.Id}").ToList();
+        // the same target can be executed multiple times, so we need to group by name and sum the durations.
+        // we can't use LINQ's GroupBy because the set of targets in the binlog could be huge, so we will use a dictionary to group them.
+        // we should also track the _number_ of times each target was executed.
+        var targetDurations = new Dictionary<string, TimeSpan>();
+        var targetExecutions = new Dictionary<string, int>();
+        foreach (var target in build.FindChildrenRecursive<Target>())
+        {
+            if (target == null || target.Duration == TimeSpan.Zero) continue;
+            if (targetDurations.TryGetValue(target.Name, out var existingDuration))
+            {
+                targetDurations[target.Name] = existingDuration + target.Duration;
+            }
+            else
+            {
+                targetDurations[target.Name] = target.Duration;
+            }
+            if (targetExecutions.TryGetValue(target.Name, out var existingCount))
+            {
+                targetExecutions[target.Name] = existingCount + 1;
+            }
+            else
+            {
+                targetExecutions[target.Name] = 1;
+            }
+        }
+
+        // Get the top N most expensive targets
+        var expensiveTargets = targetDurations.OrderByDescending(kvp => kvp.Value).Take(top_number);
+        return expensiveTargets.Select(kvp => $"{kvp.Key} was called {targetExecutions[kvp.Key]} times ({kvp.Value.Milliseconds} ms)").ToList();
     }
 
     [McpServerTool(Name = "list_projects"), Description("List all projects in the loaded binary log file")]
@@ -64,9 +92,21 @@ public class BinlogTool
 
     [McpServerPrompt(Name = "profile_build"), Description("Perform a build of the current workspace and profile it using the binary logger.")]
     public static IEnumerable<ChatMessage> Thing() => [
-        new ChatMessage(ChatRole.User, "Please perform a build of the current workspace using dotnet build with the binary logger enabled. You can use the `--binaryLogger` option to specify the log file name. For example: dotnet build `--binaryLogger:binlog.binlog`. Create a binlog file using a name that is randomly generated, then remember it for later use."),
-        new ChatMessage(ChatRole.Assistant, "Once the build is complete, you can use the `load_binlog` command to load the newly-generated binary log file and then use `list_targets` or `list_projects` to see the results."),
-        new ChatMessage(ChatRole.User, "Now that you have a binlog, show me the top 5 targets that took the longest time to execute in the build. Also, note if any projects had multiple evaluations. You can check evaluations using the `list_evaluations` command with the project file path."),
+        new ChatMessage(ChatRole.User, """
+            Please perform a build of the current workspace using dotnet build with the binary logger enabled. 
+            You can use the `--binaryLogger` option to specify the log file name. For example: `dotnet build --binaryLogger:binlog.binlog`. 
+            Create a binlog file using a name that is randomly generated, then remember it for later use.
+            """),
+        new ChatMessage(ChatRole.Assistant, """
+            Once the build is complete, you can use the `load_binlog` command to load the newly-generated binary log file.
+            Then use `get_expensive_targets` to list the most expensive targets,
+            and check how many evaluations a project has using the `list_evaluations` command with the project file path.
+            Multiple evaluations can sometimes be a cause of overbuilding, so it's worth checking.
+            """),
+        new ChatMessage(ChatRole.User, """
+            Now that you have a binlog, show me the top 5 targets that took the longest time to execute in the build. 
+            Also, note if any projects had multiple evaluations. You can check evaluations using the `list_evaluations` command with the project file path.
+            """),
     ];
 }
 
