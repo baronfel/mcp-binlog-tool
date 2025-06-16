@@ -5,6 +5,8 @@ using ModelContextProtocol.Server;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Build.Logging.StructuredLogger;
 using Microsoft.Extensions.AI;
+using System.Collections.Concurrent;
+using ModelContextProtocol;
 
 namespace Binlog.MCP;
 
@@ -12,24 +14,33 @@ namespace Binlog.MCP;
 
 public class BinlogTool
 {
-    private static Build? build;
+    private static ConcurrentDictionary<string, Build> builds = new ConcurrentDictionary<string, Build>();
     private static Lock buildLock = new Lock();
 
     [McpServerTool(Name = "load_binlog")]
     [Description("Load a binary log file")]
-    public static void Load(string path)
+    public static void Load(string path, IProgress<ProgressNotificationValue> mcpProgress)
     {
-        if (build != null) return;
-        lock (buildLock)
+        var fileInfo = new FileInfo(path);
+        builds.GetOrAdd(fileInfo.FullName, path =>
         {
-            build = BinaryLog.ReadBuild(path);
-        }
+            Progress progress = new Progress();
+            progress.Updated += update =>
+            {
+                mcpProgress.Report(new ProgressNotificationValue
+                {
+                    Progress = (float)update.Ratio,
+                    Total = update.BufferLength,
+                    Message = $"Loading {fileInfo.Name} ({update.BufferLength} bytes)"
+                });
+            };
+            return BinaryLog.ReadBuild(path, progress);
+        });
     }
-
     [McpServerTool(Name = "get_expensive_targets"), Description("Get the N most expensive targets in the loaded binary log file")]
-    public static List<string> GetExpensiveTargets(int top_number)
+    public static List<string> GetExpensiveTargets(string binlog_file, int top_number)
     {
-        if (build == null) return new List<string>();
+        if (!builds.TryGetValue(binlog_file, out var build)) return new List<string>();
         // the same target can be executed multiple times, so we need to group by name and sum the durations.
         // we can't use LINQ's GroupBy because the set of targets in the binlog could be huge, so we will use a dictionary to group them.
         // we should also track the _number_ of times each target was executed.
@@ -60,28 +71,25 @@ public class BinlogTool
         var expensiveTargets = targetDurations.OrderByDescending(kvp => kvp.Value).Take(top_number);
         return expensiveTargets.Select(kvp => $"{kvp.Key} was called {targetExecutions[kvp.Key]} times ({kvp.Value.Milliseconds} ms)").ToList();
     }
-
     [McpServerTool(Name = "list_projects"), Description("List all projects in the loaded binary log file")]
-    public static List<string> ListProjects()
+    public static List<string> ListProjects(string binlog_file)
     {
-        if (build == null) return new List<string>();
+        if (!builds.TryGetValue(binlog_file, out var build)) return new List<string>();
         return build.FindChildrenRecursive<Project>().Select(t => $"{t.ProjectFile} Id={t.Id}").ToList();
     }
-
     [McpServerTool(Name = "list_evaluations"), Description("List all evaluations for a specific project in the loaded binary log file. You can use the `list_projects` command to find the project file paths.")]
-    public static List<string> GetEvaluationsForProject(string projectFilePath)
+    public static List<string> GetEvaluationsForProject(string binlog_file, string projectFilePath)
     {
-        if (build == null) return new List<string>();
+        if (!builds.TryGetValue(binlog_file, out var build)) return new List<string>();
         return build.EvaluationFolder.FindChildrenRecursive<ProjectEvaluation>()
             .Where(e => e.ProjectFile.Equals(projectFilePath, StringComparison.OrdinalIgnoreCase))
             .Select(e => $"{e.Id} - {e.ProjectFile} ({e.Duration.TotalMilliseconds}ms)")
             .ToList();
     }
-
     [McpServerTool(Name = "get_evaluation_global_properties"), Description("Get the global properties for a specific evaluation in the loaded binary log file. You can use the `list_evaluations` command to find the evaluation IDs. Global properties are what make evaluations distinct from one another within the same project.")]
-    public static List<string> GetGlobalPropertiesForEvaluation(int evaluationId)
+    public static List<string> GetGlobalPropertiesForEvaluation(string binlog_file, int evaluationId)
     {
-        if (build == null) return new List<string>();
+        if (!builds.TryGetValue(binlog_file, out var build)) return new List<string>();
         var globalProperties = build.EvaluationFolder.FindChildrenRecursive<ProjectEvaluation>()
             .FirstOrDefault(e => e.Id == evaluationId)
             ?.FindChild<Folder>("Properties")
@@ -92,8 +100,8 @@ public class BinlogTool
             .ToList();
     }
 
-    [McpServerPrompt(Name = "profile_build"), Description("Perform a build of the current workspace and profile it using the binary logger.")]
-    public static IEnumerable<ChatMessage> Thing() => [
+    [McpServerPrompt(Name = "initial_build_analysis"), Description("Perform a build of the current workspace and profile it using the binary logger.")]
+    public static IEnumerable<ChatMessage> InitialBuildAnalysis() => [
         new ChatMessage(ChatRole.User, """
             Please perform a build of the current workspace using dotnet build with the binary logger enabled. 
             You can use the `--binaryLogger` option to specify the log file name. For example: `dotnet build --binaryLogger:binlog.binlog`. 
