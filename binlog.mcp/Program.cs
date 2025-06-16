@@ -25,13 +25,15 @@ public class BinlogTool
         builds.GetOrAdd(fileInfo.FullName, path =>
         {
             Progress progress = new Progress();
+            int? messageCount = null;
             progress.Updated += update =>
             {
+                messageCount ??= update.BufferLength;
                 mcpProgress.Report(new ProgressNotificationValue
                 {
                     Progress = (float)update.Ratio,
-                    Total = update.BufferLength,
-                    Message = $"Loading {fileInfo.Name} ({update.BufferLength} bytes)"
+                    Total = messageCount,
+                    Message = $"Loading {fileInfo.Name} ({messageCount} messages)",
                 });
             };
             return BinaryLog.ReadBuild(path, progress);
