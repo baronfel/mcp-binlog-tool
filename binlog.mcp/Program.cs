@@ -1,20 +1,15 @@
 ﻿using System.ComponentModel;
-using ModelContextProtocol;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using System.Collections.Concurrent;
-using ModelContextProtocol.Protocol.Types;
 using ModelContextProtocol.Server;
 using Microsoft.Extensions.DependencyInjection;
-using StructuredLogger;
-using Microsoft.VisualBasic;
 using Microsoft.Build.Logging.StructuredLogger;
+using Microsoft.Extensions.AI;
 
 namespace Binlog.MCP;
 
 #pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
 
-[McpServerToolType]
 public class BinlogTool
 {
     private static Build? build;
@@ -56,6 +51,13 @@ public class BinlogTool
 
         return string.Join(", ", result);
     }
+
+    [McpServerPrompt(Name = "profile_build"), Description("Perform a build of the current workspace and profile it using the binary logger.")]
+    public static IEnumerable<ChatMessage> Thing() => [
+        new ChatMessage(ChatRole.User, "Please perform a build of the current workspace using dotnet build with the binary logger enabled. You can use the `--binaryLogger` option to specify the log file name. For example: dotnet build `--binaryLogger:binlog.binlog`. Create a binlog file using a name that is randomly generated, then remember it for later use."),
+        new ChatMessage(ChatRole.Assistant, "Once the build is complete, you can use the `load_binlog` command to load the newly-generated binary log file and then use `list_targets` or `list_projects` to see the results."),
+        new ChatMessage(ChatRole.User, "Now that you have a binlog, show me the top 5 targets that took the longest time to execute in the build."),
+    ];
 }
 
 public static class Program
@@ -76,7 +78,8 @@ public static class Program
         builder.Services
             .AddMcpServer()
             .WithStdioServerTransport()
-            .WithTools<BinlogTool>();
+            .WithTools<BinlogTool>()
+            .WithPrompts<BinlogTool>();
         await builder.Build().RunAsync();
     }
 }
