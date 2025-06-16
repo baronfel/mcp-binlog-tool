@@ -40,6 +40,16 @@ public class BinlogTool
         return build.FindChildrenRecursive<Project>().Select(t => $"{t.ProjectFile} with id {t.Id} with properties {CreateProperties(t.GlobalProperties)}").ToList();
     }
 
+    [McpServerTool(Name = "list_evaluations"), Description("List all evaluations for a specific project in the loaded binary log file. You can use the `list_projects` command to find the project file paths.")]
+    public static List<string> GetEvaluationsForProject(string projectFilePath)
+    {
+        if (build == null) return new List<string>();
+        return build.EvaluationFolder.FindChildrenRecursive<ProjectEvaluation>()
+            .Where(e => e.ProjectFile.Equals(projectFilePath, StringComparison.OrdinalIgnoreCase))
+            .Select(e => $"{e.Id} - {e.ProjectFile}")
+            .ToList();
+    }
+
     private static string CreateProperties(IDictionary<string, string> properties)
     {
         if (properties == null) return string.Empty;
@@ -56,7 +66,7 @@ public class BinlogTool
     public static IEnumerable<ChatMessage> Thing() => [
         new ChatMessage(ChatRole.User, "Please perform a build of the current workspace using dotnet build with the binary logger enabled. You can use the `--binaryLogger` option to specify the log file name. For example: dotnet build `--binaryLogger:binlog.binlog`. Create a binlog file using a name that is randomly generated, then remember it for later use."),
         new ChatMessage(ChatRole.Assistant, "Once the build is complete, you can use the `load_binlog` command to load the newly-generated binary log file and then use `list_targets` or `list_projects` to see the results."),
-        new ChatMessage(ChatRole.User, "Now that you have a binlog, show me the top 5 targets that took the longest time to execute in the build."),
+        new ChatMessage(ChatRole.User, "Now that you have a binlog, show me the top 5 targets that took the longest time to execute in the build. Also, note if any projects had multiple evaluations. You can check evaluations using the `list_evaluations` command with the project file path."),
     ];
 }
 
