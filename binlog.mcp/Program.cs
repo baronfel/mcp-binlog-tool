@@ -65,7 +65,7 @@ public class BinlogTool
     public static List<string> ListProjects()
     {
         if (build == null) return new List<string>();
-        return build.FindChildrenRecursive<Project>().Select(t => $"{t.ProjectFile} with id {t.Id} with properties {CreateProperties(t.GlobalProperties)}").ToList();
+        return build.FindChildrenRecursive<Project>().Select(t => $"{t.ProjectFile} Id={t.Id}").ToList();
     }
 
     [McpServerTool(Name = "list_evaluations"), Description("List all evaluations for a specific project in the loaded binary log file. You can use the `list_projects` command to find the project file paths.")]
@@ -74,7 +74,7 @@ public class BinlogTool
         if (build == null) return new List<string>();
         return build.EvaluationFolder.FindChildrenRecursive<ProjectEvaluation>()
             .Where(e => e.ProjectFile.Equals(projectFilePath, StringComparison.OrdinalIgnoreCase))
-            .Select(e => $"{e.Id} - {e.ProjectFile}")
+            .Select(e => $"{e.Id} - {e.ProjectFile} ({e.Duration.TotalMilliseconds}ms)")
             .ToList();
     }
 
@@ -90,18 +90,6 @@ public class BinlogTool
         return globalProperties.Children.OfType<Property>()
             .Select(p => $"{p.Name} = {p.Value}")
             .ToList();
-    }
-
-    private static string CreateProperties(IDictionary<string, string> properties)
-    {
-        if (properties == null) return string.Empty;
-        var result = new List<string>();
-        foreach (var property in properties)
-        {
-            result.Add($"{property.Key}={property.Value}");
-        }
-
-        return string.Join(", ", result);
     }
 
     [McpServerPrompt(Name = "profile_build"), Description("Perform a build of the current workspace and profile it using the binary logger.")]
