@@ -240,6 +240,7 @@ public class BinlogTool
             {
                 return [
                     $"Target: {target.Name} (Id={target.Id})",
+                    $"Was target skipped? { target.Skipped }",
                     $"Duration: {target.Duration.TotalMilliseconds} ms",
                     $"Why was this target built? {BuildReason(target)}",
                     $"Succeeded? {target.Succeeded}",
