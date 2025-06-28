@@ -10,12 +10,9 @@ using ModelContextProtocol;
 
 namespace Binlog.MCP;
 
-#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
-
 public class BinlogTool
 {
-    private static ConcurrentDictionary<string, Build> builds = new ConcurrentDictionary<string, Build>();
-    private static Lock buildLock = new Lock();
+    private static readonly ConcurrentDictionary<string, Build> builds = new();
 
     [McpServerTool(Name = "load_binlog")]
     [Description("Load a binary log file")]
@@ -39,6 +36,7 @@ public class BinlogTool
             return BinaryLog.ReadBuild(path, progress);
         });
     }
+
     [McpServerTool(Name = "get_expensive_targets"), Description("Get the N most expensive targets in the loaded binary log file")]
     public static List<string> GetExpensiveTargets(string binlog_file, int top_number)
     {
@@ -73,12 +71,14 @@ public class BinlogTool
         var expensiveTargets = targetDurations.OrderByDescending(kvp => kvp.Value).Take(top_number);
         return expensiveTargets.Select(kvp => $"{kvp.Key} was called {targetExecutions[kvp.Key]} times ({kvp.Value.Milliseconds} ms)").ToList();
     }
+
     [McpServerTool(Name = "list_projects"), Description("List all projects in the loaded binary log file")]
     public static List<string> ListProjects(string binlog_file)
     {
         if (!builds.TryGetValue(binlog_file, out var build)) return new List<string>();
         return build.FindChildrenRecursive<Project>().Select(t => $"{t.ProjectFile} Id={t.Id}").ToList();
     }
+
     [McpServerTool(Name = "list_evaluations"), Description("List all evaluations for a specific project in the loaded binary log file. You can use the `list_projects` command to find the project file paths.")]
     public static List<string> GetEvaluationsForProject(string binlog_file, string projectFilePath)
     {
@@ -88,6 +88,7 @@ public class BinlogTool
             .Select(e => $"{e.Id} - {e.ProjectFile} ({e.Duration.TotalMilliseconds}ms)")
             .ToList();
     }
+
     [McpServerTool(Name = "get_evaluation_global_properties"), Description("Get the global properties for a specific evaluation in the loaded binary log file. You can use the `list_evaluations` command to find the evaluation IDs. Global properties are what make evaluations distinct from one another within the same project.")]
     public static List<string> GetGlobalPropertiesForEvaluation(string binlog_file, int evaluationId)
     {
@@ -105,8 +106,8 @@ public class BinlogTool
     [McpServerPrompt(Name = "initial_build_analysis"), Description("Perform a build of the current workspace and profile it using the binary logger.")]
     public static IEnumerable<ChatMessage> InitialBuildAnalysis() => [
         new ChatMessage(ChatRole.User, """
-            Please perform a build of the current workspace using dotnet build with the binary logger enabled. 
-            You can use the `--binaryLogger` option to specify the log file name. For example: `dotnet build --binaryLogger:binlog.binlog`. 
+            Please perform a build of the current workspace using dotnet build with the binary logger enabled.
+            You can use the `--binaryLogger` option to specify the log file name. For example: `dotnet build --binaryLogger:binlog.binlog`.
             Create a binlog file using a name that is randomly generated, then remember it for later use.
             """),
         new ChatMessage(ChatRole.Assistant, """
@@ -116,7 +117,7 @@ public class BinlogTool
             Multiple evaluations can sometimes be a cause of overbuilding, so it's worth checking.
             """),
         new ChatMessage(ChatRole.User, """
-            Now that you have a binlog, show me the top 5 targets that took the longest time to execute in the build. 
+            Now that you have a binlog, show me the top 5 targets that took the longest time to execute in the build.
             Also, note if any projects had multiple evaluations. You can check evaluations using the `list_evaluations` command with the project file path.
             """),
     ];
