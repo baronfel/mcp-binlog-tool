@@ -120,6 +120,16 @@ public class BinlogTool
             Also, note if any projects had multiple evaluations. You can check evaluations using the `list_evaluations` command with the project file path.
             """),
     ];
+
+    [McpServerPrompt(Name = "compare_binlogs"), Description("Compare two binary logs.")]
+    public static IEnumerable<ChatMessage> CompareBinlogs() => [
+        new ChatMessage(ChatRole.System, """
+            Get paths to two binary log files from the user.
+            Then load both binlogs using the `load_binlog` command.
+            After loading the binlogs, list all of the projects, get the evaluations for each project, and check if any projects have multiple evaluations.
+            Finally, compare the timings of the evaluations and display the comparisons in a table that compares the same evaluation across both binlogs.
+            """),
+    ];
 }
 
 public static class Program
