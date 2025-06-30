@@ -7,8 +7,7 @@
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PublishSingleFile>true</PublishSingleFile>
-    <PublishSelfContained>true</PublishSelfContained>
-    <!-- <PublishAot>true</PublishAot> -->
+    <PublishTrimmed>true</PublishTrimmed>
 
     <!-- .NET SDK tool package properties -->
     <PackAsTool>true</PackAsTool>
