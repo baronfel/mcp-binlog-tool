@@ -8,7 +8,7 @@
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach",
-            "processName": "${workspaceFolder}\\binlog.mcp\\bin\\Debug\\net9.0\\binlog.mcp.exe"
+            "processName": "${workspaceFolder}\\artifacts\\bin\\binlog.mcp\\debug\\binlog.mcp.exe"
         }
     ]
 }

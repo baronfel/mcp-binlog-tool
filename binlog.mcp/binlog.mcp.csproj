@@ -2,13 +2,30 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PublishSingleFile>true</PublishSingleFile>
-    <PublishTrimmed>true</PublishTrimmed>
+    <PublishSelfContained>true</PublishSelfContained>
+    <!-- <PublishAot>true</PublishAot> -->
+
+    <!-- .NET SDK tool package properties -->
+    <PackAsTool>true</PackAsTool>
+    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;linux-musl-arm64;osx-arm64</RuntimeIdentifiers>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageVersion>0.1.0</PackageVersion>
+    <Authors>Chet Husk</Authors>
+    <Description>An MCP Server for analyzing and investigating MSBuild binlogs.</Description>
+    <PackageTags>msbuild;binlog;mcp</PackageTags>
+    <PackageId>baronfel.binlog.mcp</PackageId>
+    <PackageType>McpServer</PackageType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="PACKAGE_README.md" Pack="true" PackagePath="/README.md" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol" />
