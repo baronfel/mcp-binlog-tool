@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -11,7 +11,7 @@
 
     <!-- .NET SDK tool package properties -->
     <PackAsTool>true</PackAsTool>
-    <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;linux-musl-arm64;osx-arm64</RuntimeIdentifiers>
+    <!-- <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;linux-musl-arm64;osx-arm64</RuntimeIdentifiers> -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageVersion>0.1.0</PackageVersion>
@@ -35,6 +35,7 @@
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="MSBuild.StructuredLogger" />
+    <PackageReference Include="Microsoft.Build.Framework" />
   </ItemGroup>
 
 </Project>
