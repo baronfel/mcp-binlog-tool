@@ -20,6 +20,7 @@
     <PackageTags>msbuild;binlog;mcp</PackageTags>
     <PackageId>baronfel.binlog.mcp</PackageId>
     <PackageType>McpServer</PackageType>
+    <ChangelogFile>CHANGELOG.md</ChangelogFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,6 +37,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="MSBuild.StructuredLogger" />
     <PackageReference Include="Microsoft.Build.Framework" />
+    <PackageReference Include="Ionide.KeepAChangelog.Tasks" />
   </ItemGroup>
 
 </Project>
