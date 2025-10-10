@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.3] - 2025-10-10
+
+### Added
+
+- New structured outputs for all tools to improve performance
+- Two new tools - one to list matching files in a binlog, and one to get contents of a specific file
+
+### Changed
+
+- Update package dependencies
+
 ## [0.0.2] - 2025-10-10
 
 ### Added

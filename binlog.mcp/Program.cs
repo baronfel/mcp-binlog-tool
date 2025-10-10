@@ -5,11 +5,12 @@ using ModelContextProtocol.Server;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Build.Logging.StructuredLogger;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.FileSystemGlobbing;
 using System.Collections.Concurrent;
 using ModelContextProtocol;
 using System.Collections.Frozen;
-using System.Text.Json.Serialization;
 using Microsoft.Build.Framework;
+using Microsoft.VisualBasic;
 
 namespace Binlog.MCP;
 
@@ -23,6 +24,41 @@ public readonly record struct ProjectFilePath(string path);
 public readonly record struct EvalId(int id);
 public readonly record struct ProjectId(int id);
 
+public class Timeline
+{
+    public ConcurrentDictionary<int, List<TimedNode>> NodesByNodeId = new();
+    public Timeline(Build build)
+    {
+        Populate(build);
+    }
+
+    private void Populate(Build build)
+    {
+        build.ParallelVisitAllChildren<TimedNode>(node =>
+            {
+                if (node is not TimedNode timedNode)
+                {
+                    return;
+                }
+
+                if (timedNode is Build)
+                {
+                    return;
+                }
+
+                if (timedNode is Microsoft.Build.Logging.StructuredLogger.Task task &&
+                    (string.Equals(task.Name, "MSBuild", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(task.Name, "CallTarget", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return;
+                }
+
+                var nodeId = timedNode.NodeId;
+                var lane = NodesByNodeId.GetOrAdd(nodeId, (_) => new());
+                lane.Add(timedNode);
+            });
+    }
+}
 
 public class BinlogTool
 {
@@ -37,15 +73,19 @@ public class BinlogTool
     private static readonly ConcurrentDictionary<BinlogPath, FrozenDictionary<ProjectId, Project>> projectsById = new();
     private static readonly ConcurrentDictionary<BinlogPath, FrozenDictionary<EvalId, FrozenSet<ProjectId>>> projectsByEvaluation = new();
 
-    [McpServerTool(Name = "load_binlog")]
-    [Description("Load a binary log file")]
-    public static void Load(
-        [Description("The path to a MSBuild binlog file to load and analyze")] string path,
+    private static readonly ConcurrentDictionary<BinlogPath, Timeline> timeLinesByPath = new();
+
+    public record struct InterestingBuildData(long totalDurationMs, int nodeCount);
+
+    [McpServerTool(Name = "load_binlog", UseStructuredContent = true, Idempotent = true, ReadOnly = true)]
+    [Description("Load a binary log file from a given absolute path")]
+    public static InterestingBuildData Load(
+        [Description("The absolute path to a MSBuild binlog file to load and analyze")] string path,
         IProgress<ProgressNotificationValue> mcpProgress)
     {
         BinlogPath binlog = new(path);
         mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Loading {binlog.FullPath}" });
-        builds.GetOrAdd(binlog, binlog =>
+        var thisBuild = builds.GetOrAdd(binlog, binlog =>
         {
 
             Progress progress = new Progress();
@@ -99,11 +139,27 @@ public class BinlogTool
                 .ToFrozenDictionary(e => new EvalId(e), e => projects.Where(p => p.EvaluationId == e).Select(p => new ProjectId(p.Id)).ToFrozenSet());
             return evalsAndProjects;
         });
+        mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Computing node timelines mapping" });
+        var timeline = timeLinesByPath.GetOrAdd(binlog, binlog =>
+        {
+            var build = builds[binlog];
+            var timeline = new Timeline(build);
+            return timeline;
+        });
         mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Done loading data for {binlog.FullPath}" });
+
+        return new InterestingBuildData(totalDurationMs: (long)thisBuild.Duration.TotalMilliseconds, nodeCount: timeline.NodesByNodeId.Keys.Count);
     }
 
-    [McpServerTool(Name = "get_expensive_targets", Title = "Get Expensive Targets", Idempotent = true), Description("Get the N most expensive targets in the loaded binary log file")]
-    public static string[] GetExpensiveTargets(
+    public record struct TargetExecutionData(
+        [Description("The number of times the target was actually run.")] int executionCount,
+        [Description("The number of times the target was requested but not run due to incrementality. Generally the higher this number the better.")] int skippedCount,
+        [Description("The total inclusive duration of the target execution in milliseconds. This time includes 'child' Target calls, so it may not be representative of the work actually done _in_ this Target.")] long inclusiveDurationMs,
+        [Description("The total exclusive duration of the target execution in milliseconds. This is the work done _in_ this Target.")] long exclusiveDurationMs);
+
+    [McpServerTool(Name = "get_expensive_targets", Title = "Get Expensive Targets", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("Get the N most expensive targets in the loaded binary log file")]
+    public static Dictionary<string, TargetExecutionData> GetExpensiveTargets(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
         [Description("The number of top targets to return")] int top_number
     )
@@ -112,57 +168,108 @@ public class BinlogTool
         // the same target can be executed multiple times, so we need to group by name and sum the durations.
         // we can't use LINQ's GroupBy because the set of targets in the binlog could be huge, so we will use a dictionary to group them.
         // we should also track the _number_ of times each target was executed.
-        var targetDurations = new Dictionary<string, TimeSpan>();
+        var targetInclusiveDurations = new Dictionary<string, TimeSpan>();
+        var targetExclusiveDurations = new Dictionary<string, TimeSpan>();
         var targetExecutions = new Dictionary<string, int>();
+        var targetSkips = new Dictionary<string, int>();
         foreach (var target in build.FindChildrenRecursive<Target>())
         {
             if (target == null || target.Duration == TimeSpan.Zero) continue;
-            if (targetDurations.TryGetValue(target.Name, out var existingDuration))
+            if (targetInclusiveDurations.TryGetValue(target.Name, out var existingDuration))
             {
-                targetDurations[target.Name] = existingDuration + target.Duration;
+                targetInclusiveDurations[target.Name] = existingDuration + target.Duration;
             }
             else
             {
-                targetDurations[target.Name] = target.Duration;
+                targetInclusiveDurations[target.Name] = target.Duration;
             }
-            if (targetExecutions.TryGetValue(target.Name, out var existingCount))
+
+            var innerCallsDuration = target.FindChildrenRecursive<Microsoft.Build.Logging.StructuredLogger.Task>().Aggregate(TimeSpan.Zero, (counter, task) => counter + task.Duration);
+            TimeSpan exclusiveDuration;
+            if (innerCallsDuration != TimeSpan.Zero)
             {
-                targetExecutions[target.Name] = existingCount + 1;
+                // if we spent any time in inner target calls, we should subtract that from the inclusive duration to get the exclusive duration.
+                exclusiveDuration = target.Duration - innerCallsDuration;
             }
             else
             {
-                targetExecutions[target.Name] = 1;
+                // if there are no inner target calls, the exclusive duration is the same as the inclusive duration.
+                exclusiveDuration = target.Duration;
+            }
+
+            if (targetExclusiveDurations.TryGetValue(target.Name, out var existingExclusiveDuration))
+            {
+                targetExclusiveDurations[target.Name] = existingExclusiveDuration + exclusiveDuration;
+            }
+            else
+            {
+                targetExclusiveDurations[target.Name] = exclusiveDuration;
+            }
+
+            if (target.Skipped)
+            {
+                if (targetSkips.TryGetValue(target.Name, out var existingSkipCount))
+                {
+                    targetSkips[target.Name] = existingSkipCount + 1;
+                }
+                else
+                {
+                    targetSkips[target.Name] = 1;
+                }
+            }
+            else
+            {
+
+                if (targetExecutions.TryGetValue(target.Name, out var existingCount))
+                {
+                    targetExecutions[target.Name] = existingCount + 1;
+                }
+                else
+                {
+                    targetExecutions[target.Name] = 1;
+                }
             }
         }
 
-        // Get the top N most expensive targets
-        var expensiveTargets = targetDurations.OrderByDescending(kvp => kvp.Value).Take(top_number);
-        return [.. expensiveTargets.Select(kvp => $"{kvp.Key} was called {targetExecutions[kvp.Key]} times ({kvp.Value.Milliseconds} ms)")];
+        // Get the top N most expensive targets by exclusive duration
+        var expensiveTargets =
+            targetExclusiveDurations
+                .OrderByDescending(kvp => kvp.Value)
+                .Take(top_number)
+                .ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => new TargetExecutionData(
+                        executionCount: targetExecutions.TryGetValue(kvp.Key, out var execCount) ? execCount : 0,
+                        skippedCount: targetSkips.TryGetValue(kvp.Key, out var skipCount) ? skipCount : 0,
+                        inclusiveDurationMs: (long)targetInclusiveDurations[kvp.Key].TotalMilliseconds,
+                        exclusiveDurationMs: (long)kvp.Value.TotalMilliseconds));
+        return expensiveTargets;
     }
 
-    [McpServerTool(Name = "list_projects", Title = "List Projects", Idempotent = true), Description("List all projects in the loaded binary log file")]
-    public static string[] ListProjects(
+    public record struct ProjectData(string projectFile, int id, Dictionary<int, EntryTargetData>? entryTargets);
+    public record struct EntryTargetData(string targetName, int id, long durationMs);
+
+    [McpServerTool(Name = "list_projects", Title = "List Projects", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("List all projects in the loaded binary log file")]
+    public static Dictionary<int, ProjectData> ListProjects(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file
         )
     {
         if (!builds.TryGetValue(new(binlog_file), out var build)) return [];
-        return [.. build.FindChildrenRecursive<Project>().Select(MakeProjectSummary)];
+        return projectsById[new(binlog_file)].Values.ToDictionary(p => p.Id, MakeProjectSummary);
     }
 
-    public static string MakeProjectSummary(Project p)
+    public static ProjectData MakeProjectSummary(Project p)
     {
-        var targetInfo = p.EntryTargets?.Select(p.FindChild<Target>)?.Where(t => t != null);
-        var part = $"{p.ProjectFile} Id={p.Id}";
-        if (targetInfo is not null)
-        {
-            var targets = string.Join(", ", targetInfo.Select(t => $"{t.Name} (Id={t.Id}) (Duration={t.Duration.TotalMilliseconds}ms)"));
-            part += $" EntryTargets=[{targets}]";
-        }
-        return part;
+        var targetInfo = p.EntryTargets?.Select(p.FindTarget)?.Where(t => t != null);
+        return new(p.ProjectFile, p.Id, targetInfo?.ToDictionary(t => t.Id, t => new EntryTargetData(t.Name, t.Id, (long)t.Duration.TotalMilliseconds)));
     }
 
-    [McpServerTool(Name = "list_evaluations", Title = "Get Project Evaluations", Idempotent = true), Description("List all evaluations for a specific project in the loaded binary log file. You can use the `list_projects` command to find the project file paths.")]
-    public static string[] GetEvaluationsForProject(
+    public record struct EvaluationData(int id, string projectFile, long durationMs);
+
+    [McpServerTool(Name = "list_evaluations", Title = "Get Project Evaluations", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("List all evaluations for a specific project in the loaded binary log file. You can use the `list_projects` command to find the project file paths.")]
+    public static Dictionary<int, EvaluationData> GetEvaluationsForProject(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
         [Description("The path to the project file to get evaluations for")] string projectFilePath)
     {
@@ -174,14 +281,15 @@ public class BinlogTool
         )
         {
             var build = builds[binlog];
-            var evalData = evalIds.Select(e => build.FindEvaluation(e.id)).Select(e => $"{e.Id} - {e.ProjectFile} ({e.Duration.TotalMilliseconds}ms)");
-            return [.. evalData];
+            var evalData = evalIds.Select(e => build.FindEvaluation(e.id)).Select(e => new EvaluationData(e.Id, e.ProjectFile, (long)e.Duration.TotalMilliseconds));
+            return evalData.ToDictionary(e => e.id);
         }
         return [];
     }
 
-    [McpServerTool(Name = "get_evaluation_global_properties", Title = "Get Properties for Evaluation", Idempotent = true), Description("Get the global properties for a specific evaluation in the loaded binary log file. You can use the `list_evaluations` command to find the evaluation IDs. Global properties are what make evaluations distinct from one another within the same project.")]
-    public static string[] GetGlobalPropertiesForEvaluation(
+    [McpServerTool(Name = "get_evaluation_global_properties", Title = "Get Properties for Evaluation", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("Get the global properties for a specific evaluation in the loaded binary log file. You can use the `list_evaluations` command to find the evaluation IDs. Global properties are what make evaluations distinct from one another within the same project.")]
+    public static Dictionary<string, string> GetGlobalPropertiesForEvaluation(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
         [Description("The ID of the evaluation to get properties for")] int evaluationId)
     {
@@ -191,15 +299,22 @@ public class BinlogTool
             && eval.FindChild<Folder>("Properties") is var propertiesFolder
             && propertiesFolder.FindChild<Folder>("Global") is var globalProperties)
         {
-            return [..globalProperties.Children.OfType<Property>()
-                .Select(p => $"{p.Name} = {p.Value}")];
+            return globalProperties.Children.OfType<Property>().ToDictionary(p => p.Name, p => p.Value);
         }
 
         return [];
     }
 
-    [McpServerTool(Name = "get_target_info_by_name", Title = "Get Target Information", Idempotent = true), Description("Get some details about a specific target called in a project within the loaded binary log file. This includes the target's duration, its ID, why it was built, etc.")]
-    public static string[] GetTargetInfoByName(
+    public abstract record TargetBuildReason;
+    public record DependsOnReason(string targetThatDependsOnCurrentTarget) : TargetBuildReason;
+    public record BeforeTargetsReason(string targetThatThisTargetMustRunBefore) : TargetBuildReason;
+    public record AfterTargetsReason(string targetThatThisTargetIsRunningAfter) : TargetBuildReason;
+    public record struct TargetInfo(int id, string name, long durationMs, bool succeeded, bool skipped, TargetBuildReason? builtReason, string[] targetMessages);
+
+
+    [McpServerTool(Name = "get_target_info_by_name", Title = "Get Target Information", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("Get some details about a specific target called in a project within the loaded binary log file. This includes the target's duration, its ID, why it was built, etc.")]
+    public static TargetInfo? GetTargetInfoByName(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
         [Description("The ID of the project containing the target")] int projectId,
         [Description("The name of the target to get dependencies for")] string targetName)
@@ -211,22 +326,16 @@ public class BinlogTool
             var target = project.FindTarget(targetName);
             if (target != null)
             {
-                return [
-                    $"Target: {target.Name} (Id={target.Id})",
-                    $"Duration: {target.Duration.TotalMilliseconds} ms",
-                    $"Why was this target built? {BuildReason(target)}",
-                    $"Succeeded? {target.Succeeded}",
-                    $"Messages:",
-                    ..target.Children.OfType<Message>().Select(m => $"\t{m.Text}"),
-                ];
+                return new(target.Id, target.Name, (long)target.Duration.TotalMilliseconds, target.Succeeded, target.Skipped, BuildReason(target), [.. target.Children.OfType<Message>().Select(m => m.Text)]);
             }
         }
 
-        return [];
+        return null;
     }
 
-    [McpServerTool(Name = "get_target_info_by_id", Title = "Get Target Information", Idempotent = true), Description("Get some details about a specific target called in a project within the loaded binary log file. This includes the target's duration, its ID, why it was built, etc. This is more efficient than `get_target_info_by_name` if you already know the target ID, as it avoids searching by name.")]
-    public static string[] GetTargetInfoById(
+    [McpServerTool(Name = "get_target_info_by_id", Title = "Get Target Information", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("Get some details about a specific target called in a project within the loaded binary log file. This includes the target's duration, its ID, why it was built, etc. This is more efficient than `get_target_info_by_name` if you already know the target ID, as it avoids searching by name.")]
+    public static TargetInfo? GetTargetInfoById(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
         [Description("The ID of the project containing the target")] int projectId,
         [Description("The ID of the target to get dependencies for")] int targetId)
@@ -238,34 +347,29 @@ public class BinlogTool
             var target = project.GetTargetById(targetId);
             if (target != null)
             {
-                return [
-                    $"Target: {target.Name} (Id={target.Id})",
-                    $"Was target skipped? { target.Skipped }",
-                    $"Duration: {target.Duration.TotalMilliseconds} ms",
-                    $"Why was this target built? {BuildReason(target)}",
-                    $"Succeeded? {target.Succeeded}",
-                    $"Messages:",
-                    ..target.Children.OfType<Message>().Select(m => $"\t{m.Text}"),
-                ];
+                return new(target.Id, target.Name, (long)target.Duration.TotalMilliseconds, target.Succeeded, target.Skipped, BuildReason(target), [.. target.Children.OfType<Message>().Select(m => m.Text)]);
             }
         }
 
-        return [];
+        return null;
     }
 
-    public static string BuildReason(Target target)
+    private static TargetBuildReason? BuildReason(Target target)
     {
         return target.TargetBuiltReason switch
         {
-            TargetBuiltReason.AfterTargets => $"It had AfterTargets='{target.ParentTarget}' directly or indirectly",
-            TargetBuiltReason.BeforeTargets => $"Target '{target.Name}' had BeforeTargets='{target.ParentTarget}'",
-            TargetBuiltReason.DependsOn => $"The parent target '{target.ParentTarget}' had DependsOnTargets on this target",
-            _ => "No specific reason provided for why this target was built."
+            TargetBuiltReason.AfterTargets => new AfterTargetsReason(target.ParentTarget),
+            TargetBuiltReason.BeforeTargets => new BeforeTargetsReason(target.ParentTarget),
+            TargetBuiltReason.DependsOn => new DependsOnReason(target.ParentTarget),
+            _ => null
         };
     }
 
-    [McpServerTool(Name = "get_project_target_list", Title = "Get Project Target List", Idempotent = true), Description("Get a list of targets for a specific project in the loaded binary log file. This includes the target's name, ID, and duration.")]
-    public static string GetProjectTargetList(
+    public record struct ProjectTargetListData(int id, string name, long durationMs);
+
+    [McpServerTool(Name = "get_project_target_list", Title = "Get Project Target List", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("Get a list of targets for a specific project in the loaded binary log file. This includes the target's name, ID, and duration.")]
+    public static IEnumerable<ProjectTargetListData> GetProjectTargetList(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
         [Description("The ID of the project to get targets for")] int projectId)
     {
@@ -276,10 +380,39 @@ public class BinlogTool
             var targets = project.Children.OfType<Target>();
             if (targets is not null)
             {
-                return string.Join(", ", targets.Select(t => $"{t.Name} (Id={t.Id}) (Duration={t.Duration.TotalMilliseconds}ms)"));
+                return targets.Select(t => new ProjectTargetListData(t.Id, t.Name, (long)t.Duration.TotalMilliseconds));
             }
         }
-        return "No targets found for this project.";
+        return [];
+    }
+
+    [McpServerTool(Name = "list_files_from_binlog", Title = "List Files from Binlog", Idempotent = true, ReadOnly = true)]
+    [Description("List all source files from the loaded binary log file, optionally filtering by a path pattern.")]
+    public static IEnumerable<string> ListFilesFromBinlog(
+        [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlogPath,
+        [Description("An optional path pattern to filter the files inside the binlog")] string? pathPattern)
+    {
+        if (!builds.TryGetValue(new(binlogPath), out var build)) throw new InvalidOperationException($"Binlog {binlogPath} has not been loaded. Please load it using the `load_binlog` command first.");
+        if (pathPattern != null)
+        {
+            var matcher = new Matcher();
+            matcher.AddInclude(pathPattern);
+            return build.SourceFiles.Where(f => matcher.Match(f.FullPath).HasMatches).Select(f => f.FullPath);
+        }
+        else
+        {
+            return build.SourceFiles.Select(f => f.FullPath);
+        }
+    }
+
+    [McpServerTool(Name = "get_file_from_binlog", Title = "Get File from Binlog", Idempotent = true, ReadOnly = true)]
+    [Description("Get a specific source file from the loaded binary log file.")]
+    public static string? GetFileFromBinlog(
+        [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlogPath,
+        [Description("An absolute path of a file inside the binlog")] string filePathInsideBinlog)
+    {
+        if (!builds.TryGetValue(new(binlogPath), out var build)) throw new InvalidOperationException($"Binlog {binlogPath} has not been loaded. Please load it using the `load_binlog` command first.");
+        return build.SourceFiles.FirstOrDefault(f => f.FullPath == filePathInsideBinlog)?.Text;
     }
 
     [McpServerPrompt(Name = "initial_build_analysis", Title = "Analyze Binary Log"), Description("Perform a build of the current workspace and profile it using the binary logger.")]
@@ -318,32 +451,17 @@ public static class Program
     {
         Log.Logger = new LoggerConfiguration()
            .MinimumLevel.Verbose() // Capture all log levels
-           .WriteTo.File(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "logs", "TestServer_.log"),
-               rollingInterval: RollingInterval.Day,
-               outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
            .WriteTo.Debug()
            .WriteTo.Console(standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
            .CreateLogger();
 
         var builder = Host.CreateApplicationBuilder(args);
         builder.Services.AddSerilog();
-        var jsonConfig = new System.Text.Json.JsonSerializerOptions();
-        jsonConfig.TypeInfoResolverChain.Add(SourceGenerationContext.Default);
         builder.Services
             .AddMcpServer()
             .WithStdioServerTransport()
-            .WithTools<BinlogTool>(jsonConfig)
-            .WithPrompts<BinlogTool>(jsonConfig);
+            .WithTools<BinlogTool>()
+            .WithPrompts<BinlogTool>();
         await builder.Build().RunAsync();
     }
-}
-
-[JsonSourceGenerationOptions(WriteIndented = true)]
-[JsonSerializable(typeof(string[]))]
-[JsonSerializable(typeof(int))]
-[JsonSerializable(typeof(ProgressNotificationValue))]
-[JsonSerializable(typeof(IEnumerable<ChatMessage>))]
-internal partial class SourceGenerationContext : JsonSerializerContext
-{
-
 }
