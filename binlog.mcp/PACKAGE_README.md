@@ -9,14 +9,14 @@ This package provides a tool for reading and analyzing Microsoft Build Engine (M
 
 ```json
 {
-	"mcp": {
-		"servers": {
-			"msbuild": {
-				"command": "dnx",
-				"args": [ "baronfel.binlog.mcp", "-y" ]
-			}
-		}
-	}
+  "mcp": {
+    "servers": {
+      "msbuild": {
+        "command": "dnx",
+        "args": [ "baronfel.binlog.mcp", "-y" ]
+      }
+    }
+  }
 }
 ```
 

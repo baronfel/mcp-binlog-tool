@@ -14,7 +14,6 @@
     <!-- <RuntimeIdentifiers>win-x64;win-arm64;linux-x64;linux-arm64;linux-musl-arm64;osx-arm64</RuntimeIdentifiers> -->
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageVersion>0.1.0</PackageVersion>
     <Authors>Chet Husk</Authors>
     <Description>An MCP Server for analyzing and investigating MSBuild binlogs.</Description>
     <PackageTags>msbuild;binlog;mcp</PackageTags>
@@ -25,6 +24,7 @@
 
   <ItemGroup>
     <Content Include="PACKAGE_README.md" Pack="true" PackagePath="/README.md" />
+    <Content Include=".mcp\server.json" Pack="true" PackagePath="/.mcp/server.json" />
   </ItemGroup>
 
   <ItemGroup>
