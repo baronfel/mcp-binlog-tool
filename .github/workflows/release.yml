@@ -19,6 +19,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Get version from tag
+        id: tag_name
+        run: |
+          echo ::set-output name=current_version::${GITHUB_REF#refs/tags/v}
+        shell: bash
+
       - name: Setup .NET Core
         uses:  actions/setup-dotnet@v4
 
@@ -29,13 +35,13 @@ jobs:
         id: changelog_reader
         uses: mindsers/changelog-reader-action@v2
         with:
-          version: ${{ github.ref }}
+          version: ${{ steps.tag_name.outputs.current_version }}
           path: ./binlog.mcp/CHANGELOG.md
 
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: artifacts/package/release/baronfel.binlog.mcp.${{ github.ref }}.nupkg
+          artifacts: artifacts/package/release/baronfel.binlog.mcp.${{ steps.tag_name.outputs.current_version }}.nupkg
           token: ${{ secrets.GITHUB_TOKEN }}
           body: ${{ steps.changelog_reader.outputs.changes }}
 
@@ -47,4 +53,4 @@ jobs:
           user: ${{secrets.NUGET_USER}}
 
       - name: Push packages
-        run: dotnet nuget push artifacts/package/release/baronfel.binlog.mcp.${{ github.ref }}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{steps.login.outputs.NUGET_API_KEY}}
+        run: dotnet nuget push artifacts/package/release/baronfel.binlog.mcp.${{ steps.tag_name.outputs.current_version }}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{steps.login.outputs.NUGET_API_KEY}}
