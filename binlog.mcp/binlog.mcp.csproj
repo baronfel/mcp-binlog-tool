@@ -20,6 +20,7 @@
     <PackageId>baronfel.binlog.mcp</PackageId>
     <PackageType>McpServer</PackageType>
     <ChangelogFile>CHANGELOG.md</ChangelogFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
