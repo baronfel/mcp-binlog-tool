@@ -1,11 +1,25 @@
 {
-  "$schema": "https://gist.githubusercontent.com/timheuer/7b092645f01fe15fad2a96677d0b34e6/raw/0fb577cb5dc65f4eabe06b4f0da3901b22542db6/mcp-server-config.json",
-  "inputs": [],
-  "servers": {
-    "baronfel.binlog.mcp": {
-      "type": "stdio",
-      "command": "dnx",
-      "args": ["baronfel.binlog.mcp", "--yes"]
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "description": "An MCP Server for analyzing and investigating MSBuild binlogs.",
+  "name": "io.github.baronfel/baronfel.binlog.mcp",
+  "title": "Chet's Experimental Binlog MCP",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "identifier": "baronfel.binlog.mcp",
+      "version": "0.0.5",
+      "transport": {
+        "type": "stdio"
+      }
     }
-  }
+  ],
+  "repository": {
+    "url": "https://github.com/baronfel/mcp-binlog-tool",
+    "source": "github"
+  },
+  "version": "0.0.5",
+  "version_detail": {
+    "version": "0.0.5"
+  },
+  "websiteUrl": "https://github.com/baronfel/mcp-binlog-tool"
 }
