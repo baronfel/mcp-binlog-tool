@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.4] - 2025-11-02
+
+### Changed
+
+- Update packaging information to be valid for nuget.org's MCP server configuration examples
+
 ## [0.0.3] - 2025-10-10
 
 ### Added
