@@ -460,8 +460,8 @@ public static class Program
         builder.Services
             .AddMcpServer()
             .WithStdioServerTransport()
-            .WithTools<BinlogTool>()
-            .WithPrompts<BinlogTool>();
+            .WithTools<BinlogTool>(BinlogJsonOptions.Options)
+            .WithPrompts<BinlogTool>(BinlogJsonOptions.Options);
         await builder.Build().RunAsync();
     }
 }
