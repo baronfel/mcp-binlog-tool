@@ -7,7 +7,7 @@
     {
       "registryType": "nuget",
       "identifier": "baronfel.binlog.mcp",
-      "version": "0.0.5",
+      "version": "0.0.6",
       "transport": {
         "type": "stdio"
       }
@@ -17,9 +17,9 @@
     "url": "https://github.com/baronfel/mcp-binlog-tool",
     "source": "github"
   },
-  "version": "0.0.5",
+  "version": "0.0.6",
   "version_detail": {
-    "version": "0.0.5"
+    "version": "0.0.6"
   },
   "websiteUrl": "https://github.com/baronfel/mcp-binlog-tool"
 }

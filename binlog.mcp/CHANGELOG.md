@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6] - 2025-11-14
+
+### Changed
+
+- Fix serialization errors
+- Bump to .NET 10 TFM
+
 ## [0.0.5] - 2025-11-02
 
 ### Changed
