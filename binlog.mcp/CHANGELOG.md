@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.0.7] - 2025-11-14
+
+### Added
+
+- New tool `get_project_build_time` to calculate total build time for a specific project with optional target filtering
+- New tool `get_expensive_projects` to get top N most expensive projects sorted by exclusive or inclusive time
+- New tool `get_project_target_times` to get all target execution times for a project in one call
+- New tool `search_targets_by_name` to find all executions of a specific target across all projects
+- Caching system for project build time data to improve performance on repeated queries
+
+### Changed
+
+- Unified exclusive/inclusive duration calculation logic across project-level analysis tools
+- First call to project analysis tools now populates cached data for all projects in the binlog
+
 ## [0.0.6] - 2025-11-14
 
 ### Changed

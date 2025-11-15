@@ -10,7 +10,6 @@ using System.Collections.Concurrent;
 using ModelContextProtocol;
 using System.Collections.Frozen;
 using Microsoft.Build.Framework;
-using Microsoft.VisualBasic;
 
 namespace Binlog.MCP;
 
@@ -74,6 +73,12 @@ public class BinlogTool
     private static readonly ConcurrentDictionary<BinlogPath, FrozenDictionary<EvalId, FrozenSet<ProjectId>>> projectsByEvaluation = new();
 
     private static readonly ConcurrentDictionary<BinlogPath, Timeline> timeLinesByPath = new();
+
+    /// <summary>
+    /// Tracks computed project build time data by project ID, within a specific binlog file.
+    /// Key: (BinlogPath, excludeTargets set as comma-separated sorted string)
+    /// </summary>
+    private static readonly ConcurrentDictionary<(BinlogPath, string), FrozenDictionary<ProjectId, ProjectBuildTimeData>> projectBuildTimeCache = new();
 
     public record struct InterestingBuildData(long totalDurationMs, int nodeCount);
 
@@ -184,18 +189,7 @@ public class BinlogTool
                 targetInclusiveDurations[target.Name] = target.Duration;
             }
 
-            var innerCallsDuration = target.FindChildrenRecursive<Microsoft.Build.Logging.StructuredLogger.Task>().Aggregate(TimeSpan.Zero, (counter, task) => counter + task.Duration);
-            TimeSpan exclusiveDuration;
-            if (innerCallsDuration != TimeSpan.Zero)
-            {
-                // if we spent any time in inner target calls, we should subtract that from the inclusive duration to get the exclusive duration.
-                exclusiveDuration = target.Duration - innerCallsDuration;
-            }
-            else
-            {
-                // if there are no inner target calls, the exclusive duration is the same as the inclusive duration.
-                exclusiveDuration = target.Duration;
-            }
+            var exclusiveDuration = CalculateExclusiveDuration(target);
 
             if (targetExclusiveDurations.TryGetValue(target.Name, out var existingExclusiveDuration))
             {
@@ -413,6 +407,249 @@ public class BinlogTool
     {
         if (!builds.TryGetValue(new(binlogPath), out var build)) throw new InvalidOperationException($"Binlog {binlogPath} has not been loaded. Please load it using the `load_binlog` command first.");
         return build.SourceFiles.FirstOrDefault(f => f.FullPath == filePathInsideBinlog)?.Text;
+    }
+
+    public record struct ProjectBuildTimeData(
+        [Description("The total exclusive duration of all targets in the project in milliseconds. This is the actual work done in this project.")] long exclusiveDurationMs,
+        [Description("The total inclusive duration of all targets in the project in milliseconds. This includes child target calls.")] long inclusiveDurationMs,
+        [Description("The number of targets that were executed in this project.")] int targetCount);
+
+    /// <summary>
+    /// Calculate exclusive duration for a target by subtracting MSBuild task durations that invoke
+    /// ProjectReference Protocol targets. Per the ProjectReference Protocol, only MSBuild task calls
+    /// to specific protocol targets (GetTargetFrameworks, GetTargetFrameworkProperties, GetTargetPath,
+    /// GetNativeManifest, GetCopyToOutputDirectoryItems, Clean, etc.) are considered "inclusive" time.
+    /// All other MSBuild task usage is considered exclusive work by the parent target.
+    /// See: https://github.com/dotnet/msbuild/blob/main/documentation/ProjectReference-Protocol.md
+    /// </summary>
+    private static TimeSpan CalculateExclusiveDuration(Target target)
+    {
+        // ProjectReference Protocol targets that represent cross-project calls
+        var projectReferenceProtocolTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "GetTargetFrameworks",
+            "GetTargetFrameworksWithPlatformForSingleTargetFramework",
+            "GetTargetFrameworkProperties",
+            "GetTargetPath",
+            "GetNativeManifest",
+            "GetCopyToOutputDirectoryItems",
+            "_GetCopyToOutputDirectoryItemsFromTransitiveProjectReferences",
+            "Clean",
+            "CleanReferencedProjects",
+            "GetPackagingOutputs",
+            // Default target is typically "Build" but can vary
+            "Build"
+        };
+
+        // Find MSBuild tasks that invoke ProjectReference Protocol targets
+        var projectReferenceCallsDuration = target.Children
+            .OfType<Microsoft.Build.Logging.StructuredLogger.Task>()
+            .Where(task => 
+            {
+                if (!string.Equals(task.Name, "MSBuild", StringComparison.OrdinalIgnoreCase))
+                    return false;
+                
+                // Check if this MSBuild task is calling a ProjectReference Protocol target
+                // Look for target names in the task's parameters (stored as Property children with Name="Targets")
+                var targetsParam = task.Children.OfType<Property>()
+                    .FirstOrDefault(p => string.Equals(p.Name, "Targets", StringComparison.OrdinalIgnoreCase));
+                
+                if (targetsParam != null && !string.IsNullOrEmpty(targetsParam.Value))
+                {
+                    // Parse semicolon-separated target list
+                    var targetsCalled = targetsParam.Value
+                        .Split(';', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(t => t.Trim());
+                    
+                    return targetsCalled.Any(t => projectReferenceProtocolTargets.Contains(t));
+                }
+                
+                // If no explicit targets specified, it calls the default target (usually Build)
+                // which is part of the ProjectReference Protocol
+                return true;
+            })
+            .Aggregate(TimeSpan.Zero, (counter, task) => counter + task.Duration);
+        
+        return projectReferenceCallsDuration != TimeSpan.Zero 
+            ? target.Duration - projectReferenceCallsDuration 
+            : target.Duration;
+    }
+
+    /// <summary>
+    /// Compute and cache project build time data for all projects in a binlog.
+    /// </summary>
+    private static FrozenDictionary<ProjectId, ProjectBuildTimeData> EnsureProjectBuildTimeData(
+        BinlogPath binlog,
+        HashSet<string> excludeSet)
+    {
+        // Create a cache key from sorted exclude targets
+        var cacheKey = string.Join(",", excludeSet.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
+        
+        return projectBuildTimeCache.GetOrAdd((binlog, cacheKey), _ =>
+        {
+            if (!projectsById.TryGetValue(binlog, out var projects))
+            {
+                return FrozenDictionary<ProjectId, ProjectBuildTimeData>.Empty;
+            }
+
+            var result = new Dictionary<ProjectId, ProjectBuildTimeData>();
+
+            foreach (var (projectId, project) in projects)
+            {
+                var targets = project.Children.OfType<Target>()
+                    .Where(t => !excludeSet.Contains(t.Name) && !t.Skipped);
+
+                long totalInclusive = 0;
+                long totalExclusive = 0;
+                int count = 0;
+
+                foreach (var target in targets)
+                {
+                    totalInclusive += (long)target.Duration.TotalMilliseconds;
+                    var exclusiveDuration = CalculateExclusiveDuration(target);
+                    totalExclusive += (long)exclusiveDuration.TotalMilliseconds;
+                    count++;
+                }
+
+                result[projectId] = new ProjectBuildTimeData(totalExclusive, totalInclusive, count);
+            }
+
+            return result.ToFrozenDictionary();
+        });
+    }
+
+    [McpServerTool(Name = "get_project_build_time", Title = "Get Project Build Time", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("Get the total build time for a specific project, calculating exclusive time across all its targets with optional filtering to exclude specific targets.")]
+    public static ProjectBuildTimeData GetProjectBuildTime(
+        [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
+        [Description("The ID of the project to get build time for")] int projectId,
+        [Description("Optional array of target names to exclude from the calculation (e.g., ['Copy', 'CopyFilesToOutputDirectory'])")] string[]? excludeTargets = null)
+    {
+        var binlog = new BinlogPath(binlog_file);
+        var excludeSet = excludeTargets?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+        
+        var buildTimeData = EnsureProjectBuildTimeData(binlog, excludeSet);
+        
+        return buildTimeData.TryGetValue(new ProjectId(projectId), out var data) 
+            ? data 
+            : new ProjectBuildTimeData(0, 0, 0);
+    }
+
+    public record struct ExpensiveProjectData(
+        [Description("The project file path")] string projectFile,
+        [Description("The project ID")] int projectId,
+        [Description("The total exclusive duration of all targets in the project in milliseconds")] long exclusiveDurationMs,
+        [Description("The total inclusive duration of all targets in the project in milliseconds")] long inclusiveDurationMs,
+        [Description("The number of targets executed in this project")] int targetCount);
+
+    [McpServerTool(Name = "get_expensive_projects", Title = "Get Expensive Projects", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("Get the N most expensive projects in the loaded binary log file, aggregated at the project level with options to exclude specific targets and show exclusive vs inclusive time.")]
+    public static Dictionary<int, ExpensiveProjectData> GetExpensiveProjects(
+        [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
+        [Description("The number of top projects to return")] int top_number,
+        [Description("Optional array of target names to exclude from the calculation (e.g., ['Copy', 'CopyFilesToOutputDirectory'])")] string[]? excludeTargets = null,
+        [Description("Whether to sort by exclusive time (true) or inclusive time (false). Default is exclusive.")] bool sortByExclusive = true)
+    {
+        var binlog = new BinlogPath(binlog_file);
+        if (!projectsById.TryGetValue(binlog, out var projects))
+        {
+            return [];
+        }
+
+        var excludeSet = excludeTargets?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+        
+        var buildTimeData = EnsureProjectBuildTimeData(binlog, excludeSet);
+        
+        var projectData = buildTimeData
+            .Where(kvp => kvp.Value.targetCount > 0)
+            .Select(kvp => new ExpensiveProjectData(
+                projects[kvp.Key].ProjectFile,
+                kvp.Key.id,
+                kvp.Value.exclusiveDurationMs,
+                kvp.Value.inclusiveDurationMs,
+                kvp.Value.targetCount));
+        
+        var sorted = sortByExclusive 
+            ? projectData.OrderByDescending(p => p.exclusiveDurationMs)
+            : projectData.OrderByDescending(p => p.inclusiveDurationMs);
+            
+        return sorted.Take(top_number).ToDictionary(p => p.projectId);
+    }
+
+    public record struct TargetTimeData(
+        [Description("The target ID")] int id,
+        [Description("The target name")] string name,
+        [Description("The inclusive duration of the target in milliseconds")] long inclusiveDurationMs,
+        [Description("The exclusive duration of the target in milliseconds")] long exclusiveDurationMs,
+        [Description("Whether the target was skipped")] bool skipped);
+
+    [McpServerTool(Name = "get_project_target_times", Title = "Get Project Target Times", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("Get all target execution times for a specific project in one call, including both inclusive and exclusive durations.")]
+    public static Dictionary<int, TargetTimeData> GetProjectTargetTimes(
+        [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
+        [Description("The ID of the project to get target times for")] int projectId)
+    {
+        var binlog = new BinlogPath(binlog_file);
+        if (!projectsById.TryGetValue(binlog, out var projects) ||
+            !projects.TryGetValue(new ProjectId(projectId), out var project))
+        {
+            return [];
+        }
+
+        var targets = project.Children.OfType<Target>();
+        var result = new Dictionary<int, TargetTimeData>();
+
+        foreach (var target in targets)
+        {
+            var inclusiveMs = (long)target.Duration.TotalMilliseconds;
+            var exclusiveDuration = CalculateExclusiveDuration(target);
+            var exclusiveMs = (long)exclusiveDuration.TotalMilliseconds;
+
+            result[target.Id] = new TargetTimeData(target.Id, target.Name, inclusiveMs, exclusiveMs, target.Skipped);
+        }
+
+        return result;
+    }
+
+    public record struct TargetExecutionInfo(
+        [Description("The project ID containing this target execution")] int projectId,
+        [Description("The project file path")] string projectFile,
+        [Description("The target ID")] int targetId,
+        [Description("The inclusive duration in milliseconds")] long inclusiveDurationMs,
+        [Description("The exclusive duration in milliseconds")] long exclusiveDurationMs,
+        [Description("Whether the target was skipped")] bool skipped);
+
+    [McpServerTool(Name = "search_targets_by_name", Title = "Search Targets by Name", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [Description("Find all executions of a specific target across all projects (e.g., 'CoreCompile') and return their timing information.")]
+    public static Dictionary<string, TargetExecutionInfo> SearchTargetsByName(
+        [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
+        [Description("The name of the target to search for (case-insensitive)")] string targetName)
+    {
+        var binlog = new BinlogPath(binlog_file);
+        if (!projectsById.TryGetValue(binlog, out var projects))
+        {
+            return [];
+        }
+
+        var results = new Dictionary<string, TargetExecutionInfo>();
+        int counter = 0;
+
+        foreach (var project in projects.Values)
+        {
+            var matchingTargets = project.Children.OfType<Target>().Where(t => string.Equals(t.Name, targetName, StringComparison.OrdinalIgnoreCase));
+
+            foreach (var target in matchingTargets)
+            {
+                var inclusiveMs = (long)target.Duration.TotalMilliseconds;
+                var exclusiveDuration = CalculateExclusiveDuration(target);
+                var exclusiveMs = (long)exclusiveDuration.TotalMilliseconds;
+
+                var key = $"{project.ProjectFile}_{target.Id}_{counter++}";
+                results[key] = new TargetExecutionInfo(project.Id, project.ProjectFile, target.Id, inclusiveMs, exclusiveMs, target.Skipped);
+            }
+        }
+
+        return results;
     }
 
     [McpServerPrompt(Name = "initial_build_analysis", Title = "Analyze Binary Log"), Description("Perform a build of the current workspace and profile it using the binary logger.")]

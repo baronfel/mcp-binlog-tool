@@ -80,6 +80,41 @@ Get a specific source file from the loaded binary log file.
   - `filePathInsideBinlog` (string): An absolute path of a file inside the binlog
 - **Returns**: The text content of the file, or null if not found
 
+### `get_project_build_time`
+Get the total build time for a specific project, calculating exclusive time across all its targets with optional filtering.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `projectId` (int): The ID of the project to get build time for
+  - `excludeTargets` (string[], optional): Optional array of target names to exclude from the calculation (e.g., ['Copy', 'CopyFilesToOutputDirectory'])
+- **Returns**: `ProjectBuildTimeData` containing exclusive duration, inclusive duration, and target count
+- **Note**: Results are cached for performance; first call populates data for all projects
+
+### `get_expensive_projects`
+Get the N most expensive projects in the loaded binary log file, aggregated at the project level.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `top_number` (int): The number of top projects to return
+  - `excludeTargets` (string[], optional): Optional array of target names to exclude from the calculation (e.g., ['Copy', 'CopyFilesToOutputDirectory'])
+  - `sortByExclusive` (bool, default true): Whether to sort by exclusive time (true) or inclusive time (false)
+- **Returns**: Dictionary of project IDs mapped to `ExpensiveProjectData` containing project file, ID, exclusive/inclusive durations, and target count
+- **Note**: Results are cached for performance; uses same cache as `get_project_build_time`
+
+### `get_project_target_times`
+Get all target execution times for a specific project in one call.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `projectId` (int): The ID of the project to get target times for
+- **Returns**: Dictionary of target IDs mapped to `TargetTimeData` containing ID, name, inclusive/exclusive durations, and skip status
+- **Note**: More efficient than querying each target individually
+
+### `search_targets_by_name`
+Find all executions of a specific target across all projects and return their timing information.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `targetName` (string): The name of the target to search for (case-insensitive)
+- **Returns**: Dictionary of unique keys mapped to `TargetExecutionInfo` containing project ID, project file, target ID, inclusive/exclusive durations, and skip status
+- **Example**: Search for "CoreCompile" to see all compilation executions across the build
+
 ## Prompts
 
 The binlog.mcp tool provides the following MCP prompts for common analysis workflows:
