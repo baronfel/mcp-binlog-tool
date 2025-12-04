@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.0.8] - 2025-12-03
+
+### Changed
+
+- Updating MSBuild.StructuredLogger 2.3.71 to 2.3.109.
+- Updating Microsoft.Build.Framework 17.14.8 to 18.0.2.
+- Updating Microsoft.Extensions.Hosting 9.0.9 to 10.0.0.
+- Updating ModelContextProtocol 0.4.0-preview.3 to 0.4.1-preview.1.
+- Updating Serilog.Extensions.Hosting 9.0.0 to 10.0.0.
+- Updating Serilog.Sinks.Console 6.0.0 to 6.1.1.
+
 ## [0.0.7] - 2025-11-14
 
 ### Added

@@ -4,14 +4,14 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Ionide.KeepAChangelog.Tasks" Version="0.3.1" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
-    <PackageVersion Include="ModelContextProtocol" Version="0.4.0-preview.3" />
-    <PackageVersion Include="MSBuild.StructuredLogger" Version="2.3.71" />
-    <PackageVersion Include="Microsoft.Build.Framework" Version="17.14.8" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+    <PackageVersion Include="ModelContextProtocol" Version="0.4.1-preview.1" />
+    <PackageVersion Include="MSBuild.StructuredLogger" Version="2.3.109" />
+    <PackageVersion Include="Microsoft.Build.Framework" Version="18.0.2" />
     <PackageVersion Include="Microsoft.Extensions.FileSystemGlobbing" Version="9.0.9" />
     <PackageVersion Include="Serilog" Version="4.3.0" />
-    <PackageVersion Include="Serilog.Extensions.Hosting" Version="9.0.0" />
-    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageVersion Include="Serilog.Sinks.Debug" Version="3.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
