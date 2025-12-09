@@ -14,7 +14,7 @@ public class GetExpensiveTasksTool
     [Description("Get the N most expensive MSBuild tasks in the loaded binary log file, aggregated by task name.")]
     public static Dictionary<string, TaskExecutionData> GetExpensiveTasks(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
-        [Description("The number of top tasks to return")] int top_number)
+        [Description("The number of top tasks to return. If not specified, returns all")] int? top_number)
     {
         var binlog = new BinlogPath(binlog_file);
         if (!BinlogLoader.TryGetBuild(binlog, out var build) || build == null) return [];
@@ -35,7 +35,7 @@ public class GetExpensiveTasksTool
         }
 
         // Calculate aggregated statistics
-        var aggregatedData = taskStats.Select(kvp =>
+        var ordered = taskStats.Select(kvp =>
         {
             var taskName = kvp.Key;
             var tasks = kvp.Value;
@@ -54,10 +54,10 @@ public class GetExpensiveTasksTool
                     durations.Max())
             };
         })
-        .OrderByDescending(x => x.Data.totalDurationMs)
-        .Take(top_number)
-        .ToDictionary(x => x.TaskName, x => x.Data);
+        .OrderByDescending(x => x.Data.totalDurationMs);
 
-        return aggregatedData;
+        return top_number.HasValue
+            ? ordered.Take(top_number.Value).ToDictionary(x => x.TaskName, x => x.Data)
+            : ordered.ToDictionary(x => x.TaskName, x => x.Data);
     }
 }
