@@ -52,7 +52,6 @@ public class GetExpensiveAnalyzersTool
             {
                 AnalyzerName = analyzerName,
                 Data = new AggregatedAnalyzerData(
-                    analyzerName,
                     durations.Count,
                     durations.Sum(),
                     durations.Sum() / durations.Count,

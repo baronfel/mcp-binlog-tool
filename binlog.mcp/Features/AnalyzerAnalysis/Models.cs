@@ -35,7 +35,6 @@ public record struct CscAnalyzerData(
 /// Aggregated analyzer execution data across the entire build.
 /// </summary>
 public record struct AggregatedAnalyzerData(
-    [Description("The analyzer or generator name")] string name,
     [Description("The number of times this analyzer was executed")] int executionCount,
     [Description("The total execution duration across all invocations in milliseconds")] long totalDurationMs,
     [Description("The average execution duration per invocation in milliseconds")] long averageDurationMs,
