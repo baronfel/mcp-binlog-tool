@@ -20,6 +20,8 @@ public static class TimelineAnalysisExtensions
             var timeline = Features.TimelineAnalysis.TimelineCache.GetOrCompute(binlog, build);
             return timeline.NodesByNodeId.Keys.Count;
         });
+
+        builder.WithTools<Features.TimelineAnalysis.GetNodeTimelineTool>(BinlogJsonOptions.Options);
         return builder;
     }
 }
