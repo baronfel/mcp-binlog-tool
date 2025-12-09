@@ -11,7 +11,7 @@ public class ExpensiveTargetsTool
     [Description("Get the N most expensive targets in the loaded binary log file")]
     public static Dictionary<string, TargetExecutionData> GetExpensiveTargets(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
-        [Description("The number of top targets to return")] int top_number)
+        [Description("The number of top targets to return. If not specified, returns all")] int? top_number)
     {
         var binlog = new BinlogPath(binlog_file);
         if (!BinlogLoader.TryGetBuild(binlog, out var build) || build == null) return [];
@@ -73,18 +73,16 @@ public class ExpensiveTargetsTool
         }
 
         // Get the top N most expensive targets by exclusive duration
-        var expensiveTargets =
+        var orderedByCost =
             targetExclusiveDurations
-                .OrderByDescending(kvp => kvp.Value)
-                .Take(top_number)
-                .ToDictionary(
+                .OrderByDescending(kvp => kvp.Value);
+        var limited = top_number.HasValue ? orderedByCost.Take(top_number.Value) : orderedByCost;
+        return limited.ToDictionary(
                     kvp => kvp.Key,
                     kvp => new TargetExecutionData(
                         executionCount: targetExecutions.TryGetValue(kvp.Key, out var execCount) ? execCount : 0,
                         skippedCount: targetSkips.TryGetValue(kvp.Key, out var skipCount) ? skipCount : 0,
                         inclusiveDurationMs: (long)targetInclusiveDurations[kvp.Key].TotalMilliseconds,
                         exclusiveDurationMs: (long)kvp.Value.TotalMilliseconds));
-
-        return expensiveTargets;
     }
 }
