@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.0.9] - 2025-12-09
+
+### Added
+
+- New tool `get_task_info` to get detailed information about a specific MSBuild task invocation including parameters and messages
+- New tool `list_tasks_in_target` to list all MSBuild task invocations within a specific target
+- New tool `search_tasks_by_name` to find all invocations of a specific MSBuild task across all projects
+- New tool `get_expensive_tasks` to get the N most expensive MSBuild tasks aggregated by task name with execution statistics
+- New tool `get_task_analyzers` to extract Roslyn analyzer and source generator execution data from a specific Csc task invocation
+- New tool `get_expensive_analyzers` to get the N most expensive Roslyn analyzers and source generators across the entire build
+- New tool `get_node_timeline` to get timeline of active and inactive time for a specific build node
+
+### Changed
+
+- Made `top_number` parameter optional all tools - returns all results when not specified
+
 ## [0.0.8] - 2025-12-03
 
 ### Changed
