@@ -1,5 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Binlog.MCP.Features.EvaluationAnalysis;
+using Binlog.MCP.Features.ProjectAnalysis;
+using Binlog.MCP.Features.TargetAnalysis;
+using Binlog.MCP.Features.TimelineAnalysis;
+using static Binlog.MCP.Features.BinlogLoading.LoadBinlogTool;
 
 namespace Binlog.MCP;
 
@@ -11,32 +16,35 @@ namespace Binlog.MCP;
     JsonSerializerDefaults.Web,
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     NumberHandling = JsonNumberHandling.AllowReadingFromString)]
-[JsonSerializable(typeof(BinlogTool.InterestingBuildData))]
-[JsonSerializable(typeof(BinlogTool.TargetExecutionData))]
-[JsonSerializable(typeof(Dictionary<string, BinlogTool.TargetExecutionData>))]
-[JsonSerializable(typeof(BinlogTool.ProjectData))]
-[JsonSerializable(typeof(Dictionary<int, BinlogTool.ProjectData>))]
-[JsonSerializable(typeof(BinlogTool.EntryTargetData))]
-[JsonSerializable(typeof(Dictionary<int, BinlogTool.EntryTargetData>))]
-[JsonSerializable(typeof(BinlogTool.EvaluationData))]
-[JsonSerializable(typeof(Dictionary<int, BinlogTool.EvaluationData>))]
+[JsonSerializable(typeof(InterestingBuildData))]
+[JsonSerializable(typeof(TargetExecutionData))]
+[JsonSerializable(typeof(Dictionary<string, TargetExecutionData>))]
+[JsonSerializable(typeof(ProjectData))]
+[JsonSerializable(typeof(Dictionary<int, ProjectData>))]
+[JsonSerializable(typeof(EntryTargetData))]
+[JsonSerializable(typeof(Dictionary<int, EntryTargetData>))]
+[JsonSerializable(typeof(EvaluationData))]
+[JsonSerializable(typeof(Dictionary<int, EvaluationData>))]
 [JsonSerializable(typeof(Dictionary<string, string>))]
-[JsonSerializable(typeof(BinlogTool.TargetBuildReason))]
-[JsonSerializable(typeof(BinlogTool.DependsOnReason))]
-[JsonSerializable(typeof(BinlogTool.BeforeTargetsReason))]
-[JsonSerializable(typeof(BinlogTool.AfterTargetsReason))]
-[JsonSerializable(typeof(BinlogTool.TargetInfo))]
-[JsonSerializable(typeof(BinlogTool.TargetInfo?))]
-[JsonSerializable(typeof(BinlogTool.ProjectTargetListData))]
-[JsonSerializable(typeof(IEnumerable<BinlogTool.ProjectTargetListData>))]
-[JsonSerializable(typeof(BinlogTool.ProjectBuildTimeData))]
-[JsonSerializable(typeof(BinlogTool.ExpensiveProjectData))]
-[JsonSerializable(typeof(Dictionary<int, BinlogTool.ExpensiveProjectData>))]
-[JsonSerializable(typeof(BinlogTool.TargetTimeData))]
-[JsonSerializable(typeof(Dictionary<int, BinlogTool.TargetTimeData>))]
-[JsonSerializable(typeof(BinlogTool.TargetExecutionInfo))]
-[JsonSerializable(typeof(Dictionary<string, BinlogTool.TargetExecutionInfo>))]
+[JsonSerializable(typeof(TargetBuildReason))]
+[JsonSerializable(typeof(DependsOnReason))]
+[JsonSerializable(typeof(BeforeTargetsReason))]
+[JsonSerializable(typeof(AfterTargetsReason))]
+[JsonSerializable(typeof(TargetInfo))]
+[JsonSerializable(typeof(TargetInfo?))]
+[JsonSerializable(typeof(ProjectTargetListData))]
+[JsonSerializable(typeof(IEnumerable<ProjectTargetListData>))]
+[JsonSerializable(typeof(ProjectBuildTimeData))]
+[JsonSerializable(typeof(ExpensiveProjectData))]
+[JsonSerializable(typeof(Dictionary<int, ExpensiveProjectData>))]
+[JsonSerializable(typeof(TargetTimeData))]
+[JsonSerializable(typeof(Dictionary<int, TargetTimeData>))]
+[JsonSerializable(typeof(TargetExecutionInfo))]
+[JsonSerializable(typeof(Dictionary<string, TargetExecutionInfo>))]
 [JsonSerializable(typeof(IEnumerable<string>))]
+[JsonSerializable(typeof(Timeline))]
+[JsonSerializable(typeof(Timeline.NodeStats))]
+[JsonSerializable(typeof(Dictionary<int, Timeline.NodeStats>))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(string[]))]
 internal partial class BinlogJsonContext : JsonSerializerContext
