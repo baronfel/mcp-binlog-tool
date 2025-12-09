@@ -115,6 +115,65 @@ Find all executions of a specific target across all projects and return their ti
 - **Returns**: Dictionary of unique keys mapped to `TargetExecutionInfo` containing project ID, project file, target ID, inclusive/exclusive durations, and skip status
 - **Example**: Search for "CoreCompile" to see all compilation executions across the build
 
+### `get_task_info`
+Get detailed information about a specific MSBuild task invocation.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `projectId` (int): The ID of the project containing the task
+  - `targetId` (int): The ID of the target containing the task
+  - `taskId` (int): The ID of the task to get information for
+- **Returns**: `TaskDetails` containing task name, assembly, duration, parameters, and messages
+
+### `list_tasks_in_target`
+List all MSBuild task invocations within a specific target, ordered by ID.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `projectId` (int): The ID of the project containing the target
+  - `targetId` (int): The ID of the target to list tasks for
+- **Returns**: Dictionary of task IDs mapped to `TaskDetails` containing task name, assembly, duration, parameters, and messages
+
+### `search_tasks_by_name`
+Find all invocations of a specific MSBuild task across all projects.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `taskName` (string): The name of the task to search for (case-insensitive)
+- **Returns**: Nested dictionary structure (project ID → target ID → task ID) mapped to `SimpleTaskInfo` containing task name and duration
+- **Example**: Search for "Csc" to find all C# compilation tasks
+
+### `get_expensive_tasks`
+Get the N most expensive MSBuild tasks across the entire build, aggregated by task name.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `top_number` (int, optional): The number of top tasks to return. If not specified, returns all tasks
+- **Returns**: Dictionary of task names mapped to `TaskExecutionData` containing task name, assembly, execution count, total/average/min/max durations
+- **Note**: Useful for identifying which tasks consume the most build time across all projects
+
+### `get_task_analyzers`
+Extract Roslyn analyzer and source generator execution data from a specific Csc task invocation.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `projectId` (int): The ID of the project containing the task
+  - `targetId` (int): The ID of the target containing the task
+  - `taskId` (int): The ID of the Csc task to analyze
+- **Returns**: `CscAnalyzerData` containing dictionaries of analyzer and generator assemblies with individual analyzer timing data, or null if no analyzer data found
+- **Note**: Only works with Csc (C# compiler) tasks that have analyzer performance data enabled
+
+### `get_expensive_analyzers`
+Get the N most expensive Roslyn analyzers and source generators across the entire build.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `top_number` (int, optional): The number of top analyzers to return. If not specified, returns all analyzers
+- **Returns**: Dictionary of analyzer/generator names mapped to `AggregatedAnalyzerData` containing name, execution count, total/average/min/max durations
+- **Note**: Aggregates analyzer performance data from all Csc task invocations in the build; helps identify slow analyzers
+
+### `get_node_timeline`
+Get the timeline of active and inactive time for a specific build node.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `nodeId` (int): The ID of the node to get timeline for
+- **Returns**: `NodeStats` containing active and inactive time in milliseconds for the specified node
+- **Note**: Helps understand node utilization and identify bottlenecks in parallel builds
+
 ## Prompts
 
 The binlog.mcp tool provides the following MCP prompts for common analysis workflows:
