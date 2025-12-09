@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Binlog.MCP.Features.EvaluationAnalysis;
 using Binlog.MCP.Features.ProjectAnalysis;
 using Binlog.MCP.Features.TargetAnalysis;
+using Binlog.MCP.Features.TaskAnalysis;
 using Binlog.MCP.Features.TimelineAnalysis;
 using static Binlog.MCP.Features.BinlogLoading.LoadBinlogTool;
 
@@ -45,6 +46,14 @@ namespace Binlog.MCP;
 [JsonSerializable(typeof(Timeline))]
 [JsonSerializable(typeof(Timeline.NodeStats))]
 [JsonSerializable(typeof(Dictionary<int, Timeline.NodeStats>))]
+[JsonSerializable(typeof(SimpleTaskInfo))]
+[JsonSerializable(typeof(Dictionary<int, SimpleTaskInfo>))]
+[JsonSerializable(typeof(Dictionary<int, Dictionary<int, SimpleTaskInfo>>))]
+[JsonSerializable(typeof(TaskDetails))]
+[JsonSerializable(typeof(TaskDetails?))]
+[JsonSerializable(typeof(Dictionary<int, TaskDetails>))]
+[JsonSerializable(typeof(TaskExecutionData))]
+[JsonSerializable(typeof(Dictionary<string, TaskExecutionData>))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(string[]))]
 internal partial class BinlogJsonContext : JsonSerializerContext
