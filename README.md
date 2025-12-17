@@ -18,14 +18,14 @@ See [PACKAGE_README.md](binlog.mcp/PACKAGE_README.md) for detailed tool document
 
 To configure this:
 
-1. build the repo with `dotnet build` in the `msbuild.mcp` directory
+1. build the repo with `dotnet build` in the solution root directory
 2. configure [Claude](#claude) or [VSCode](#vscode) to use the server
 3. launch your server app and have fun!
 
 To locally debug, use npx to run the Model Context Protocol inspector::
 
 ```bash
-npx @modelcontextprotocol/inspector ./bin/Debug/net9.0/msbuild.mcp
+npx @modelcontextprotocol/inspector ./artifacts/bin/binlog.mcp/debug/binlog.mcp.exe
 ```
 
 ### Claude
@@ -33,7 +33,7 @@ npx @modelcontextprotocol/inspector ./bin/Debug/net9.0/msbuild.mcp
 {
   "mcpServers": {
     "msbuild": {
-      "command": "<your repo root>\\binlog.mcp\\bin\\Debug\\net9.0\\binlog.mcp.exe"
+      "command": "<your repo root>\\artifacts\\bin\\binlog.mcp\\debug\\binlog.mcp.exe"
     }
   }
 }
@@ -51,14 +51,11 @@ otherwise, you can configure the server directly:
 
 ```json
 {
-    "mcp": {
-        "inputs": [],
-        "servers": {
-            "msbuild": {
-                "command": "<repo root>\\binlog.mcp\\bin\\Debug\\net9.0\\binlog.mcp.exe",
-                "args": [],
-                "env": {}
-            }
+    "servers": {
+        "binlog-mcp": {
+			      "type": "stdio",
+            "command": "<repo root>\\artifacts\\bin\\binlog.mcp\\debug\\binlog.mcp.exe",
+            "args": []
         }
     }
 }
