@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.10] - 2025-12-17
+
+### Changed
+
+- Fixed the `search_tasks_by_name` tool to correctly report results.
+
 ## [0.0.9] - 2025-12-09
 
 ### Added
