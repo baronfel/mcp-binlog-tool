@@ -51,12 +51,12 @@ otherwise, you can configure the server directly:
 
 ```json
 {
-    "servers": {
-        "binlog-mcp": {
-			      "type": "stdio",
-            "command": "<repo root>\\artifacts\\bin\\binlog.mcp\\debug\\binlog.mcp.exe",
-            "args": []
-        }
+  "servers": {
+    "binlog-mcp": {
+      "type": "stdio",
+      "command": "<repo root>\\artifacts\\bin\\binlog.mcp\\debug\\binlog.mcp.exe",
+      "args": []
     }
+  }
 }
 ```
