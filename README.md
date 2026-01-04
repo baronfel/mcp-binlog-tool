@@ -6,6 +6,8 @@ This is a simple demo of a Model Context Protocol Server (MCP) that exposes tool
 
 The server provides comprehensive tools for analyzing MSBuild binary logs, including:
 
+- **Diagnostic Analysis**: Extract warnings and errors from binlogs with filtering by severity, project, target, and task
+- **Search Analysis**: Powerful freetext search with MSBuild Structured Log Viewer query syntax support
 - **Target Analysis**: Identify expensive targets, search for specific targets across projects, and analyze target execution times
 - **Project Analysis**: Calculate project build times, find the most expensive projects, and analyze all targets in a project at once
 - **Evaluation Analysis**: List project evaluations, inspect global properties, and identify potential overbuilding issues

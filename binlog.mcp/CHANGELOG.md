@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.11] - 2026-01-04
+
+### Added
+
+- New **Diagnostic Analysis** feature with `get_diagnostics` tool to extract warnings and errors from binlogs
+- New **Search Analysis** feature with `search_binlog` with full MSBuild Structured Log Viewer query syntax support.
+
 ## [0.0.10] - 2025-12-17
 
 ### Changed
