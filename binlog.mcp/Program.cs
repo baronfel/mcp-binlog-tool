@@ -23,6 +23,7 @@ builder.Services.AddMcpServer()
     .AddEvaluationAnalysis()
     .AddBuildAnalysis()
     .AddTimelineAnalysis()
-    .AddDiagnosticAnalysis();
+    .AddDiagnosticAnalysis()
+    .AddSearchAnalysis();
 
 await builder.Build().RunAsync();

@@ -4,6 +4,7 @@ using Binlog.MCP.Features.AnalyzerAnalysis;
 using Binlog.MCP.Features.DiagnosticAnalysis;
 using Binlog.MCP.Features.EvaluationAnalysis;
 using Binlog.MCP.Features.ProjectAnalysis;
+using Binlog.MCP.Features.SearchAnalysis;
 using Binlog.MCP.Features.TargetAnalysis;
 using Binlog.MCP.Features.TaskAnalysis;
 using Binlog.MCP.Features.TimelineAnalysis;
@@ -69,6 +70,12 @@ namespace Binlog.MCP;
 [JsonSerializable(typeof(DiagnosticInfo[]))]
 [JsonSerializable(typeof(DiagnosticFilter))]
 [JsonSerializable(typeof(DiagnosticAnalysisResult))]
+[JsonSerializable(typeof(SearchResultInfo))]
+[JsonSerializable(typeof(SearchResultInfo[]))]
+[JsonSerializable(typeof(MatchedField))]
+[JsonSerializable(typeof(MatchedField[]))]
+[JsonSerializable(typeof(SearchOptions))]
+[JsonSerializable(typeof(SearchAnalysisResult))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(string[]))]
 internal partial class BinlogJsonContext : JsonSerializerContext

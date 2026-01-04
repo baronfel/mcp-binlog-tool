@@ -20,7 +20,8 @@ public class GetDiagnosticsTool
         [Description("Filter by specific project IDs (optional)")] int[]? projectIds = null,
         [Description("Filter by specific target IDs (optional)")] int[]? targetIds = null,
         [Description("Filter by specific task IDs (optional)")] int[]? taskIds = null,
-        [Description("Maximum number of diagnostics to return (optional)")] int? maxResults = null)
+        [Description("Maximum number of diagnostics to return (optional)")] int? maxResults = null,
+        CancellationToken cancellationToken = default)
     {
         var binlog = new BinlogPath(binlog_file);
 
@@ -47,11 +48,17 @@ public class GetDiagnosticsTool
         var filteredDiagnostics = includeDetails ? new List<DiagnosticInfo>() : null;
         var totalErrorCount = 0;
         var totalWarningCount = 0;
+        var currentIndex = 0;
         var wasTruncated = false;
 
         // Single pass: filter and convert diagnostics
         foreach (var diagnostic in build.FindChildrenRecursive<AbstractDiagnostic>())
         {
+            currentIndex++;
+            if (currentIndex % 100 == 0) // check for cancellation every 100 items
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
             // Count totals regardless of filtering
             switch (diagnostic)
             {
