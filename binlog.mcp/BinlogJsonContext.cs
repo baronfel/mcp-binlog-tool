@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Binlog.MCP.Features.AnalyzerAnalysis;
+using Binlog.MCP.Features.DiagnosticAnalysis;
 using Binlog.MCP.Features.EvaluationAnalysis;
 using Binlog.MCP.Features.ProjectAnalysis;
 using Binlog.MCP.Features.TargetAnalysis;
@@ -63,6 +64,11 @@ namespace Binlog.MCP;
 [JsonSerializable(typeof(CscAnalyzerData?))]
 [JsonSerializable(typeof(AggregatedAnalyzerData))]
 [JsonSerializable(typeof(Dictionary<string, AggregatedAnalyzerData>))]
+[JsonSerializable(typeof(DiagnosticSeverity))]
+[JsonSerializable(typeof(DiagnosticInfo))]
+[JsonSerializable(typeof(DiagnosticInfo[]))]
+[JsonSerializable(typeof(DiagnosticFilter))]
+[JsonSerializable(typeof(DiagnosticAnalysisResult))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(string[]))]
 internal partial class BinlogJsonContext : JsonSerializerContext
