@@ -1,9 +1,45 @@
 using System.Collections.Concurrent;
 using System.Collections.Frozen;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Build.Logging.StructuredLogger;
 using ModelContextProtocol;
 
 namespace Binlog.MCP.Infrastructure;
+
+public record BinlogDataCache(Build Build,
+    FrozenDictionary<ProjectFilePath, EvalId[]> EvaluationsByPath,
+    FrozenDictionary<ProjectFilePath, ProjectId[]> ProjectsByPath,
+    FrozenDictionary<ProjectId, Project> ProjectsById,
+    FrozenDictionary<EvalId, FrozenSet<ProjectId>> ProjectsByEvaluation);
+
+/// <summary>
+/// A simple cache for loaded binlog data that allows for access by file path, but transparently
+/// checks the last write time to ensure data is fresh on lookup.
+/// </summary>
+public class BinlogCache
+{
+    private Dictionary<BinlogPath, DateTime> lastWriteTimes = new();
+    private ConcurrentDictionary<BinlogPath, BinlogDataCache> builds = new();
+
+    public bool TryGetValue(BinlogPath binlogPath, [NotNullWhen(true)] out BinlogDataCache? cache)
+    {
+        if (builds.TryGetValue(binlogPath, out var innerCache) &&
+            lastWriteTimes.TryGetValue(binlogPath, out var lastWriteTime)
+            && File.GetLastWriteTime(binlogPath.FullPath) == lastWriteTime)
+        {
+            cache = innerCache;
+            return true;
+        }
+        cache = null;
+        return false;
+    }
+
+    public void Add(BinlogPath binlogPath, BinlogDataCache cache)
+    {
+        builds.AddOrUpdate(binlogPath, cache, (key, oldValue) => cache);
+        lastWriteTimes[binlogPath] = File.GetLastWriteTime(binlogPath.FullPath);
+    }
+}
 
 /// <summary>
 /// Central component responsible for loading binlog files and managing cached data.
@@ -11,11 +47,7 @@ namespace Binlog.MCP.Infrastructure;
 /// </summary>
 public static class BinlogLoader
 {
-    private static readonly ConcurrentDictionary<BinlogPath, Build> builds = new();
-    private static readonly ConcurrentDictionary<BinlogPath, FrozenDictionary<ProjectFilePath, EvalId[]>> evaluationsByPath = new();
-    private static readonly ConcurrentDictionary<BinlogPath, FrozenDictionary<ProjectFilePath, ProjectId[]>> projectsByPath = new();
-    private static readonly ConcurrentDictionary<BinlogPath, FrozenDictionary<ProjectId, Project>> projectsById = new();
-    private static readonly ConcurrentDictionary<BinlogPath, FrozenDictionary<EvalId, FrozenSet<ProjectId>>> projectsByEvaluation = new();
+    private static readonly BinlogCache cache = new();
 
     /// <summary>
     /// Callbacks that are invoked after a binlog is loaded.
@@ -38,12 +70,16 @@ public static class BinlogLoader
     /// <summary>
     /// Load a binlog file and populate all caches.
     /// </summary>
-    public static LoadResult Load(BinlogPath binlog, IProgress<ProgressNotificationValue> mcpProgress)
+    public static LoadResult Load(BinlogPath binlogPath, IProgress<ProgressNotificationValue> mcpProgress)
     {
-        mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Loading {binlog.FullPath}" });
-
-        var thisBuild = builds.GetOrAdd(binlog, binlog =>
+        BinlogDataCache entry;
+        if (cache.TryGetValue(binlogPath, out var cached))
         {
+            entry = cached;
+        }
+        else
+        {
+            mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Loading {binlogPath.FullPath}" });
             Progress progress = new Progress();
             int? messageCount = null;
             progress.Updated += update =>
@@ -56,61 +92,41 @@ public static class BinlogLoader
                     Message = $"Loading all messages",
                 });
             };
-            return BinaryLog.ReadBuild(binlog.FullPath, progress);
-        });
+            var build = BinaryLog.ReadBuild(binlogPath.FullPath, progress);
 
-        mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Reading evaluation mapping" });
-        evaluationsByPath.GetOrAdd(binlog, binlog =>
-        {
-            var build = builds[binlog];
-            FrozenDictionary<ProjectFilePath, EvalId[]> evaluations =
-                build.EvaluationFolder.FindChildrenRecursive<ProjectEvaluation>()
+            mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Reading evaluation mapping" });
+            var evaluationsByPath = build.EvaluationFolder.FindChildrenRecursive<ProjectEvaluation>()
                 .GroupBy(e => e.ProjectFile)
                 .ToFrozenDictionary(g => new ProjectFilePath(g.Key), g => g.Select(e => new EvalId(e.Id)).ToArray());
-            return evaluations;
-        });
 
-        mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Reading project mapping" });
-        projectsById.GetOrAdd(binlog, binlog =>
-        {
-            var build = builds[binlog];
-            FrozenDictionary<ProjectId, Project> projects =
-                build.FindChildrenRecursive<Project>()
+            mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Reading project mapping" });
+            var projectsById = build.FindChildrenRecursive<Project>()
                 .ToFrozenDictionary(p => new ProjectId(p.Id), p => p);
-            return projects;
-        });
 
-        projectsByPath.GetOrAdd(binlog, binlog =>
-        {
-            var build = builds[binlog];
-            FrozenDictionary<ProjectFilePath, ProjectId[]> projects =
-                build.FindChildrenRecursive<Project>()
+            var projectsByPath = build.FindChildrenRecursive<Project>()
                 .GroupBy(p => p.ProjectFile)
                 .ToFrozenDictionary(g => new ProjectFilePath(g.Key), g => g.Select(p => new ProjectId(p.Id)).ToArray());
-            return projects;
-        });
 
-        projectsByEvaluation.GetOrAdd(binlog, binlog =>
-        {
-            var build = builds[binlog];
             var evalIds = build.EvaluationFolder.FindChildrenRecursive<ProjectEvaluation>().Select(e => e.Id);
-            var projects = projectsById[binlog].Values;
-            var evalsAndProjects = evalIds
+            var projects = projectsById.Values;
+            var projectsByEvaluation = evalIds
                 .ToFrozenDictionary(e => new EvalId(e), e => projects.Where(p => p.EvaluationId == e).Select(p => new ProjectId(p.Id)).ToFrozenSet());
-            return evalsAndProjects;
-        });
+
+            entry = new BinlogDataCache(build, evaluationsByPath, projectsByPath, projectsById, projectsByEvaluation);
+            cache.Add(binlogPath, entry);
+        }
 
         // Invoke post-load callbacks for feature-specific processing
         int nodeCount = 0;
         foreach (var callback in postLoadCallbacks)
         {
             mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Processing post-load callbacks..." });
-            nodeCount = Math.Max(nodeCount, callback(binlog, thisBuild));
+            nodeCount = Math.Max(nodeCount, callback(binlogPath, entry.Build));
         }
 
-        mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Done loading data for {binlog.FullPath}" });
+        mcpProgress.Report(new() { Progress = 0, Total = null, Message = $"Done loading data for {binlogPath.FullPath}" });
 
-        return new LoadResult(totalDurationMs: (long)thisBuild.Duration.TotalMilliseconds, nodeCount: nodeCount);
+        return new LoadResult(totalDurationMs: (long)entry.Build.Duration.TotalMilliseconds, nodeCount: nodeCount);
     }
 
     /// <summary>
@@ -118,15 +134,24 @@ public static class BinlogLoader
     /// </summary>
     public static Build? GetBuild(BinlogPath binlog)
     {
-        return builds.TryGetValue(binlog, out var build) ? build : null;
+        return cache.TryGetValue(binlog, out var entry) ? entry.Build : null;
     }
 
     /// <summary>
     /// Try to get the Build object for a loaded binlog.
     /// </summary>
-    public static bool TryGetBuild(BinlogPath binlog, out Build? build)
+    public static bool TryGetBuild(BinlogPath binlog, [NotNullWhen(true)] out Build? build)
     {
-        return builds.TryGetValue(binlog, out build);
+        if (cache.TryGetValue(binlog, out var entry))
+        {
+            build = entry.Build;
+            return true;
+        }
+        else
+        {
+            build = null;
+            return false;
+        }
     }
 
     /// <summary>
@@ -134,7 +159,7 @@ public static class BinlogLoader
     /// </summary>
     public static FrozenDictionary<ProjectFilePath, EvalId[]>? GetEvaluationsByPath(BinlogPath binlog)
     {
-        return evaluationsByPath.TryGetValue(binlog, out var evals) ? evals : null;
+        return cache.TryGetValue(binlog, out var entry) ? entry.EvaluationsByPath : null;
     }
 
     /// <summary>
@@ -142,15 +167,21 @@ public static class BinlogLoader
     /// </summary>
     public static FrozenDictionary<ProjectId, Project>? GetProjectsById(BinlogPath binlog)
     {
-        return projectsById.TryGetValue(binlog, out var projects) ? projects : null;
+        return cache.TryGetValue(binlog, out var entry) ? entry.ProjectsById : null;
     }
 
     /// <summary>
     /// Try to get projects by ID.
     /// </summary>
-    public static bool TryGetProjectsById(BinlogPath binlog, out FrozenDictionary<ProjectId, Project>? projects)
+    public static bool TryGetProjectsById(BinlogPath binlog, [NotNullWhen(true)] out FrozenDictionary<ProjectId, Project>? projects)
     {
-        return projectsById.TryGetValue(binlog, out projects);
+        if (cache.TryGetValue(binlog, out var entry))
+        {
+            projects = entry.ProjectsById;
+            return true;
+        }
+        projects = null;
+        return false;
     }
 
     /// <summary>
@@ -158,7 +189,7 @@ public static class BinlogLoader
     /// </summary>
     public static FrozenDictionary<ProjectFilePath, ProjectId[]>? GetProjectsByPath(BinlogPath binlog)
     {
-        return projectsByPath.TryGetValue(binlog, out var projects) ? projects : null;
+        return cache.TryGetValue(binlog, out var entry) ? entry.ProjectsByPath : null;
     }
 
     /// <summary>
@@ -166,6 +197,6 @@ public static class BinlogLoader
     /// </summary>
     public static FrozenDictionary<EvalId, FrozenSet<ProjectId>>? GetProjectsByEvaluation(BinlogPath binlog)
     {
-        return projectsByEvaluation.TryGetValue(binlog, out var projects) ? projects : null;
+        return cache.TryGetValue(binlog, out var entry) ? entry.ProjectsByEvaluation : null;
     }
 }
