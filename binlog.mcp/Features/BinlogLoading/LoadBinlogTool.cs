@@ -17,7 +17,7 @@ public class LoadBinlogTool
     /// <param name="nodeCount">Number of nodes in the timeline.</param>
     public record struct InterestingBuildData(long totalDurationMs, int nodeCount);
 
-    [McpServerTool(Name = "load_binlog", UseStructuredContent = true, Idempotent = true, ReadOnly = true)]
+    [McpServerTool(Name = "load_binlog", UseStructuredContent = true, ReadOnly = true)]
     [Description("Load a binary log file from a given absolute path")]
     public static InterestingBuildData Load(
         [Description("The absolute path to a MSBuild binlog file to load and analyze")] string path,

@@ -10,7 +10,7 @@ namespace Binlog.MCP.Features.TaskAnalysis;
 /// </summary>
 public class ListTasksTool
 {
-    [McpServerTool(Name = "list_tasks_in_target", Title = "List Tasks in Target", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "list_tasks_in_target", Title = "List Tasks in Target", UseStructuredContent = true, ReadOnly = true)]
     [Description("List all MSBuild task invocations within a specific target, ordered by duration.")]
     public static Dictionary<int, TaskDetails> ListTasksInTarget(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

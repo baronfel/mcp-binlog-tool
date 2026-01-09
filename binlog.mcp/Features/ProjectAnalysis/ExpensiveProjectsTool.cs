@@ -6,7 +6,7 @@ namespace Binlog.MCP.Features.ProjectAnalysis;
 
 public class ExpensiveProjectsTool
 {
-    [McpServerTool(Name = "get_expensive_projects", Title = "Get Expensive Projects", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_expensive_projects", Title = "Get Expensive Projects", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get the N most expensive projects in the loaded binary log file, aggregated at the project level with options to exclude specific targets and show exclusive vs inclusive time.")]
     public static Dictionary<int, ExpensiveProjectData> GetExpensiveProjects(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

@@ -10,7 +10,7 @@ namespace Binlog.MCP.Features.DiagnosticAnalysis;
 /// </summary>
 public class GetDiagnosticsTool
 {
-    [McpServerTool(Name = "get_diagnostics", Title = "Get Build Diagnostics", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_diagnostics", Title = "Get Build Diagnostics", UseStructuredContent = true, ReadOnly = true)]
     [Description("Extract diagnostic information (errors, warnings) from a binlog file with optional filtering.")]
     public static DiagnosticAnalysisResult GetDiagnostics(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

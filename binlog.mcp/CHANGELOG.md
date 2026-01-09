@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.0.12] - 2026-01-09
+
+### Changed
+
+- Binlog data cache now tracks binlog write times, so you can re-load the binlog if it has been updated. As a result, most tools are no longer Idempotent, since they may return different results if the binlog file has changed. This may lead to LLMs calling tools more often, but ensures that the data is always up to date.
+
 ## [0.0.11] - 2026-01-04
 
 ### Added

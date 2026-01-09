@@ -7,7 +7,7 @@ namespace Binlog.MCP.Features.TargetAnalysis;
 
 public class SearchTargetsTool
 {
-    [McpServerTool(Name = "search_targets_by_name", Title = "Search Targets by Name", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "search_targets_by_name", Title = "Search Targets by Name", UseStructuredContent = true, ReadOnly = true)]
     [Description("Find all executions of a specific target across all projects (e.g., 'CoreCompile') and return their timing information.")]
     public static Dictionary<string, TargetExecutionInfo> SearchTargetsByName(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

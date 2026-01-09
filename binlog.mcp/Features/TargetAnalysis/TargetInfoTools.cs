@@ -8,7 +8,7 @@ namespace Binlog.MCP.Features.TargetAnalysis;
 
 public class TargetInfoTools
 {
-    [McpServerTool(Name = "get_target_info_by_name", Title = "Get Target Information", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_target_info_by_name", Title = "Get Target Information", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get some details about a specific target called in a project within the loaded binary log file. This includes the target's duration, its ID, why it was built, etc.")]
     public static TargetInfo? GetTargetInfoByName(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
@@ -36,7 +36,7 @@ public class TargetInfoTools
         return null;
     }
 
-    [McpServerTool(Name = "get_target_info_by_id", Title = "Get Target Information", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_target_info_by_id", Title = "Get Target Information", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get some details about a specific target called in a project within the loaded binary log file. This includes the target's duration, its ID, why it was built, etc. This is more efficient than `get_target_info_by_name` if you already know the target ID, as it avoids searching by name.")]
     public static TargetInfo? GetTargetInfoById(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

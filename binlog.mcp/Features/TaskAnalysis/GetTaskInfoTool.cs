@@ -10,7 +10,7 @@ namespace Binlog.MCP.Features.TaskAnalysis;
 /// </summary>
 public class GetTaskInfoTool
 {
-    [McpServerTool(Name = "get_task_info", Title = "Get Task Information", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_task_info", Title = "Get Task Information", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get detailed information about a specific MSBuild task invocation, including parameters and messages.")]
     public static TaskDetails? GetTaskInfo(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

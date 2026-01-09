@@ -6,7 +6,7 @@ namespace Binlog.MCP.Features.BinlogLoading;
 
 public class GetFileTool
 {
-    [McpServerTool(Name = "get_file_from_binlog", Title = "Get File from Binlog", Idempotent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_file_from_binlog", Title = "Get File from Binlog", ReadOnly = true)]
     [Description("Get a specific source file from the loaded binary log file.")]
     public static string? GetFileFromBinlog(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlogPath,

@@ -10,7 +10,7 @@ namespace Binlog.MCP.Features.TaskAnalysis;
 /// </summary>
 public class SearchTasksTool
 {
-    [McpServerTool(Name = "search_tasks_by_name", Title = "Search Tasks by Name", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "search_tasks_by_name", Title = "Search Tasks by Name", UseStructuredContent = true, ReadOnly = true)]
     [Description("Find all invocations of a specific MSBuild task across all projects (e.g., 'Csc', 'Copy') and return execution summary. Returns a dictionary of dictionaries - the outer dictionary is keyed by project id, the inner keyed by task id.")]
     public static Dictionary<int, Dictionary<int, SimpleTaskInfo>> SearchTasksByName(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

@@ -8,7 +8,7 @@ namespace Binlog.MCP.Features.ProjectAnalysis;
 
 public class GetProjectTargetTimesTool
 {
-    [McpServerTool(Name = "get_project_target_times", Title = "Get Project Target Times", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_project_target_times", Title = "Get Project Target Times", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get all target execution times for a specific project in one call, including both inclusive and exclusive durations.")]
     public static Dictionary<int, TargetTimeData> GetProjectTargetTimes(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

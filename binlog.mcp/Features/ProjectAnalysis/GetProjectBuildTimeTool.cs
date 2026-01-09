@@ -6,7 +6,7 @@ namespace Binlog.MCP.Features.ProjectAnalysis;
 
 public class GetProjectBuildTimeTool
 {
-    [McpServerTool(Name = "get_project_build_time", Title = "Get Project Build Time", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_project_build_time", Title = "Get Project Build Time", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get the total build time for a specific project, calculating exclusive time across all its targets with optional filtering to exclude specific targets.")]
     public static ProjectBuildTimeData GetProjectBuildTime(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

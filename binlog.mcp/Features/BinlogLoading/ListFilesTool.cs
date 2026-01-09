@@ -7,7 +7,7 @@ namespace Binlog.MCP.Features.BinlogLoading;
 
 public class ListFilesTool
 {
-    [McpServerTool(Name = "list_files_from_binlog", Title = "List Files from Binlog", Idempotent = true, ReadOnly = true)]
+    [McpServerTool(Name = "list_files_from_binlog", Title = "List Files from Binlog", ReadOnly = true)]
     [Description("List all source files from the loaded binary log file, optionally filtering by a path pattern.")]
     public static IEnumerable<string> ListFilesFromBinlog(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlogPath,

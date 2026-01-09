@@ -7,7 +7,7 @@ namespace Binlog.MCP.Features.ProjectAnalysis;
 
 public class GetProjectTargetListTool
 {
-    [McpServerTool(Name = "get_project_target_list", Title = "Get Project Target List", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_project_target_list", Title = "Get Project Target List", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get a list of targets for a specific project in the loaded binary log file. This includes the target's name, ID, and duration.")]
     public static IEnumerable<ProjectTargetListData> GetProjectTargetList(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

@@ -11,7 +11,7 @@ namespace Binlog.MCP.Features.SearchAnalysis;
 /// </summary>
 public class SearchBinlogTool
 {
-    [McpServerTool(Name = "search_binlog", Title = "Search Binlog", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "search_binlog", Title = "Search Binlog", UseStructuredContent = true, ReadOnly = true)]
     [Description("""
         Perform freetext search within a binlog file using the same search capabilities as the MSBuild Structured Log Viewer.
 

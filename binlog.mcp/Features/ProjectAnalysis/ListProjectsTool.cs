@@ -7,7 +7,7 @@ namespace Binlog.MCP.Features.ProjectAnalysis;
 
 public class ListProjectsTool
 {
-    [McpServerTool(Name = "list_projects", Title = "List Projects", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "list_projects", Title = "List Projects", UseStructuredContent = true, ReadOnly = true)]
     [Description("List all projects in the loaded binary log file")]
     public static Dictionary<int, ProjectData> ListProjects(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file)

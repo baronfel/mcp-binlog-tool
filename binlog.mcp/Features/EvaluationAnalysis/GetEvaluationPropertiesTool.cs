@@ -7,7 +7,7 @@ namespace Binlog.MCP.Features.EvaluationAnalysis;
 
 public class GetEvaluationPropertiesTool
 {
-    [McpServerTool(Name = "get_evaluation_global_properties", Title = "Get Properties for Evaluation", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_evaluation_global_properties", Title = "Get Properties for Evaluation", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get the global properties for a specific evaluation in the loaded binary log file. You can use the `list_evaluations` command to find the evaluation IDs. Global properties are what make evaluations distinct from one another within the same project.")]
     public static Dictionary<string, string> GetGlobalPropertiesForEvaluation(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

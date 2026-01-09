@@ -7,7 +7,7 @@ namespace Binlog.MCP.Features.TargetAnalysis;
 
 public class ExpensiveTargetsTool
 {
-    [McpServerTool(Name = "get_expensive_targets", Title = "Get Expensive Targets", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_expensive_targets", Title = "Get Expensive Targets", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get the N most expensive targets in the loaded binary log file")]
     public static Dictionary<string, TargetExecutionData> GetExpensiveTargets(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

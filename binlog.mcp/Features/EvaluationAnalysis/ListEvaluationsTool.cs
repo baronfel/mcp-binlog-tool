@@ -6,7 +6,7 @@ namespace Binlog.MCP.Features.EvaluationAnalysis;
 
 public class ListEvaluationsTool
 {
-    [McpServerTool(Name = "list_evaluations", Title = "Get Project Evaluations", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "list_evaluations", Title = "Get Project Evaluations", UseStructuredContent = true, ReadOnly = true)]
     [Description("List all evaluations for a specific project in the loaded binary log file. You can use the `list_projects` command to find the project file paths.")]
     public static Dictionary<int, EvaluationData> GetEvaluationsForProject(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,

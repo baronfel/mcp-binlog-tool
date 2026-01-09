@@ -10,7 +10,7 @@ namespace Binlog.MCP.Features.TaskAnalysis;
 /// </summary>
 public class GetExpensiveTasksTool
 {
-    [McpServerTool(Name = "get_expensive_tasks", Title = "Get Expensive Tasks", Idempotent = true, UseStructuredContent = true, ReadOnly = true)]
+    [McpServerTool(Name = "get_expensive_tasks", Title = "Get Expensive Tasks", UseStructuredContent = true, ReadOnly = true)]
     [Description("Get the N most expensive MSBuild tasks in the loaded binary log file, aggregated by task name.")]
     public static Dictionary<string, TaskExecutionData> GetExpensiveTasks(
         [Description("The path to a MSBuild binlog file that has been loaded via `load_binlog`")] string binlog_file,
