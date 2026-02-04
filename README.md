@@ -2,6 +2,8 @@
 
 This is a simple demo of a Model Context Protocol Server (MCP) that exposes tools and prompts for analyzing MSBuild binlogs to any MCP server.
 
+![nuget.org link for this tool](https://img.shields.io/nuget/v/baronfel.binlog.mcp)
+
 ## Features
 
 The server provides comprehensive tools for analyzing MSBuild binary logs, including:
