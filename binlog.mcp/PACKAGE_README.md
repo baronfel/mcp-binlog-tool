@@ -63,6 +63,15 @@ Get the global properties for a specific evaluation in the loaded binary log fil
 - **Returns**: Dictionary of property names mapped to their values
 - **Note**: Global properties are what make evaluations distinct from one another within the same project
 
+### `get_evaluation_properties_by_name`
+Get specific properties by name for a project evaluation in the loaded binary log file.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `evaluationId` (int): The ID of the evaluation to get properties for
+  - `propertyNames` (string[], optional): Array of property names to retrieve. If empty or not provided, returns all properties
+- **Returns**: Dictionary of property names mapped to their values (or null if not found)
+- **Note**: Returns all properties (both global and non-global) matching the requested names. Useful for inspecting project configuration state post-evaluation
+
 ### `get_evaluation_items_by_name`
 Get specific items by type name for a project evaluation in the loaded binary log file.
 - **Parameters**:
@@ -72,15 +81,6 @@ Get specific items by type name for a project evaluation in the loaded binary lo
   - `maxItemsPerType` (int, optional, default 100): Maximum number of items to return per item type
 - **Returns**: Array of `ItemsByType` containing item type name and array of `EvaluationItem` objects (each with name and metadata dictionary)
 - **Note**: Returns items organized by item type (e.g., 'Compile', 'PackageReference', 'Reference'). Each item includes its name/identity and any associated metadata
-
-### `get_evaluation_properties_by_name`
-Get specific properties by name for a project evaluation in the loaded binary log file.
-- **Parameters**:
-  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
-  - `evaluationId` (int): The ID of the evaluation to get properties for
-  - `propertyNames` (string[], optional): Array of property names to retrieve. If empty or not provided, returns all properties
-- **Returns**: Dictionary of property names mapped to their values (or null if not found)
-- **Note**: Returns all properties (both global and non-global) matching the requested names. Useful for inspecting project configuration state post-evaluation
 
 ### `list_evaluations`
 List all evaluations for a specific project in the loaded binary log file.
