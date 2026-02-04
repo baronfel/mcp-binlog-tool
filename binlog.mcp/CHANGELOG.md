@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.0.13] - 2026-02-04
+
 ### Added
 
 - New tool `get_evaluation_properties_by_name` to retrieve specific properties by name from a project evaluation, supporting both global and non-global properties
