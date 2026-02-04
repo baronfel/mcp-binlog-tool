@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- New tool `get_evaluation_properties_by_name` to retrieve specific properties by name from a project evaluation, supporting both global and non-global properties
+- New tool `get_evaluation_items_by_name` to retrieve specific items by type name from a project evaluation, including item metadata
+
 ## [0.0.12] - 2026-01-09
 
 ### Changed

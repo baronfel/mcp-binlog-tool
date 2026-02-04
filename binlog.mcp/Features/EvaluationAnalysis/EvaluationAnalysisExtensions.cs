@@ -15,6 +15,8 @@ public static class EvaluationAnalysisExtensions
     {
         builder.WithTools<ListEvaluationsTool>(BinlogJsonOptions.Options);
         builder.WithTools<GetEvaluationPropertiesTool>(BinlogJsonOptions.Options);
+        builder.WithTools<GetEvaluationPropertiesByNameTool>(BinlogJsonOptions.Options);
+        builder.WithTools<GetEvaluationItemsByNameTool>(BinlogJsonOptions.Options);
         return builder;
     }
 }
