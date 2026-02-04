@@ -34,42 +34,54 @@ public class GetEvaluationPropertiesByNameTool
             return [];
         }
 
-        // Collect all properties from all sources (Global folder and direct properties)
+        // If specific properties are requested, use efficient single-pass lookup
+        if (propertyNames != null && propertyNames.Length > 0)
+        {
+            var nameSet = new HashSet<string>(propertyNames, StringComparer.OrdinalIgnoreCase);
+            var result = new Dictionary<string, string?>(propertyNames.Length, StringComparer.OrdinalIgnoreCase);
+
+            // Get matching properties from Global folder
+            var globalFolder = propertiesFolder.FindChild<Folder>("Global");
+            if (globalFolder != null)
+            {
+                foreach (var prop in globalFolder.Children.OfType<Property>())
+                {
+                    if (nameSet.Contains(prop.Name))
+                    {
+                        result[prop.Name] = prop.Value;
+                    }
+                }
+            }
+
+            // Get matching direct properties (non-folder children)
+            foreach (var prop in propertiesFolder.Children.OfType<Property>())
+            {
+                if (nameSet.Contains(prop.Name))
+                {
+                    result[prop.Name] = prop.Value;
+                }
+            }
+
+            return result;
+        }
+
+        // No filter - collect all properties
         var allProperties = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
-        // Get properties from Global folder
-        var globalFolder = propertiesFolder.FindChild<Folder>("Global");
-        if (globalFolder != null)
+        // Get all properties from Global folder
+        var globalFolderAll = propertiesFolder.FindChild<Folder>("Global");
+        if (globalFolderAll != null)
         {
-            foreach (var prop in globalFolder.Children.OfType<Property>())
+            foreach (var prop in globalFolderAll.Children.OfType<Property>())
             {
                 allProperties[prop.Name] = prop.Value;
             }
         }
 
-        // Get direct properties (non-folder children)
+        // Get all direct properties (non-folder children)
         foreach (var prop in propertiesFolder.Children.OfType<Property>())
         {
             allProperties[prop.Name] = prop.Value;
-        }
-
-        // Filter by requested names if provided
-        if (propertyNames != null && propertyNames.Length > 0)
-        {
-            var filtered = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var name in propertyNames)
-            {
-                if (allProperties.TryGetValue(name, out var value))
-                {
-                    filtered[name] = value;
-                }
-                else
-                {
-                    // Include requested properties even if not found (with null value)
-                    filtered[name] = null;
-                }
-            }
-            return filtered;
         }
 
         return allProperties;
