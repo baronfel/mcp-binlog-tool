@@ -20,6 +20,39 @@ See [PACKAGE_README.md](binlog.mcp/PACKAGE_README.md) for detailed tool document
 
 ## Setup
 
+### Using the NuGet package
+
+#### Claude
+
+```
+> claude mcp add binlog -- dnx baronfel.binlog.mcp -y
+Added stdio MCP server binlog with command: dnx baronfel.binlog.mcp -y to local config
+```
+
+#### VSCode
+
+If you have Claude configured already, you can tell VSCode to use the same settings by adding the following to your `settings.json`:
+
+```json
+  "chat.mcp.discovery.enabled": true,
+```
+
+otherwise, you can configure the server directly:
+
+```json
+{
+  "servers": {
+    "binlog-mcp": {
+      "type": "stdio",
+      "command": "dnx",
+      "args": ["-y", "baronfel.binlog.mcp"]
+    }
+  }
+}
+```
+
+### Using local builds
+
 To configure this:
 
 1. build the repo with `dotnet build` in the solution root directory
@@ -32,7 +65,7 @@ To locally debug, use npx to run the Model Context Protocol inspector::
 npx @modelcontextprotocol/inspector ./artifacts/bin/binlog.mcp/debug/binlog.mcp.exe
 ```
 
-### Claude
+#### Claude
 ```json
 {
   "mcpServers": {
@@ -43,7 +76,7 @@ npx @modelcontextprotocol/inspector ./artifacts/bin/binlog.mcp/debug/binlog.mcp.
 }
 ```
 
-### VSCode
+#### VSCode
 
 If you have Claude configured already, you can tell VSCode to use the same settings by adding the following to your `settings.json`:
 
