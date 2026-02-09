@@ -148,6 +148,36 @@ List all projects in the loaded binary log file.
   - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
 - **Returns**: Dictionary of project IDs mapped to `ProjectData` containing project file path, ID, and entry target information
 
+## Project State Analysis
+
+### `get_project_state`
+Get the logical model (properties and items) of a project from its evaluation state.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `projectId` (int): The ID of the project to inspect. Use `list_projects` to find project IDs
+  - `includeProperties` (bool, optional, default true): If true, includes all properties. If false, only includes a summary count
+  - `includeItems` (bool, optional, default true): If true, includes all items. If false, only includes a summary count
+- **Returns**: `ProjectStateSnapshot` containing project ID, project file, evaluation ID, properties dictionary, and items dictionary grouped by item type
+- **Note**: Returns the evaluation state (the state after project evaluation but before any targets execute). MSBuild binlogs record evaluation state but do not record incremental state changes during target execution. Use `list_target_execution_order` to see what targets executed, and `get_task_info` to see task parameters which may include output properties/items
+- **Use Cases**: 
+  - Inspect initial project configuration and item lists
+  - Understand what properties and items exist before build targets run
+  - Debug evaluation-time issues
+  - Compare evaluation state across different builds
+
+### `list_target_execution_order`
+List all targets that executed for a project in the order they executed.
+- **Parameters**:
+  - `binlog_file` (string): The path to a MSBuild binlog file that has been loaded via `load_binlog`
+  - `projectId` (int): The ID of the project to inspect. Use `list_projects` to find project IDs
+- **Returns**: Array of `TargetExecutionSummary` containing target name, target ID, duration in milliseconds, and start time relative to build start
+- **Note**: Helps you understand the build flow and identify which targets ran and in what order. Useful for understanding build sequencing and finding performance bottlenecks
+- **Use Cases**:
+  - Understand the sequence of target execution
+  - Identify which targets are taking the most time
+  - Debug target dependency issues
+  - Analyze build performance at the target level
+
 ## Search Analysis
 
 ### `search_binlog`

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- New **Project State Analysis** feature for inspecting project logical model (properties and items)
+  - `get_project_state` tool to retrieve project properties and items from evaluation state
+  - `list_target_execution_order` tool to see the sequence of target execution for a project
+  - Provides evaluation state baseline for understanding project configuration before target execution
+  - Helps answer questions about initial project state and build flow
+
 ## [0.0.13] - 2026-02-04
 
 ### Added
