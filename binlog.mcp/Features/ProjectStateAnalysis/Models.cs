@@ -27,36 +27,6 @@ public record struct ProjectStateItem(
     [Description("Metadata associated with the item")] Dictionary<string, string> metadata);
 
 /// <summary>
-/// Represents a state change event during the build.
-/// </summary>
-/// <param name="targetName">The target where this change occurred.</param>
-/// <param name="taskName">The task that caused this change.</param>
-/// <param name="changeType">The type of change (PropertySet, ItemAdded, ItemRemoved, etc.).</param>
-/// <param name="name">The name of the property or item type affected.</param>
-/// <param name="value">The new value (for properties) or item identity (for items).</param>
-public record struct StateChangeEvent(
-    [Description("The target where this change occurred")] string targetName,
-    [Description("The task that caused this change")] string taskName,
-    [Description("The type of change")] StateChangeType changeType,
-    [Description("The name of the property or item type affected")] string name,
-    [Description("The new value or item identity")] string? value);
-
-/// <summary>
-/// Types of state changes that can occur during a build.
-/// </summary>
-public enum StateChangeType
-{
-    /// <summary>A property was set or modified.</summary>
-    PropertySet,
-    /// <summary>An item was added.</summary>
-    ItemAdded,
-    /// <summary>An item was removed.</summary>
-    ItemRemoved,
-    /// <summary>Item metadata was modified.</summary>
-    MetadataModified
-}
-
-/// <summary>
 /// Summary of targets executed for a project.
 /// </summary>
 /// <param name="targetName">The target name.</param>
