@@ -4,6 +4,7 @@ using Binlog.MCP.Features.AnalyzerAnalysis;
 using Binlog.MCP.Features.DiagnosticAnalysis;
 using Binlog.MCP.Features.EvaluationAnalysis;
 using Binlog.MCP.Features.ProjectAnalysis;
+using Binlog.MCP.Features.ProjectStateAnalysis;
 using Binlog.MCP.Features.SearchAnalysis;
 using Binlog.MCP.Features.TargetAnalysis;
 using Binlog.MCP.Features.TaskAnalysis;
@@ -81,6 +82,15 @@ namespace Binlog.MCP;
 [JsonSerializable(typeof(MatchedField[]))]
 [JsonSerializable(typeof(SearchOptions))]
 [JsonSerializable(typeof(SearchAnalysisResult))]
+[JsonSerializable(typeof(ProjectStateSnapshot))]
+[JsonSerializable(typeof(ProjectStateItem))]
+[JsonSerializable(typeof(ProjectStateItem[]))]
+[JsonSerializable(typeof(Dictionary<string, ProjectStateItem[]>))]
+[JsonSerializable(typeof(StateChangeEvent))]
+[JsonSerializable(typeof(StateChangeEvent[]))]
+[JsonSerializable(typeof(StateChangeType))]
+[JsonSerializable(typeof(TargetExecutionSummary))]
+[JsonSerializable(typeof(TargetExecutionSummary[]))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(string[]))]
 internal partial class BinlogJsonContext : JsonSerializerContext
