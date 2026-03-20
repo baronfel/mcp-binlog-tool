@@ -1,29 +1,45 @@
+using Binlog.MCP;
+using Binlog.MCP.Cli;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Serilog;
-using Microsoft.Extensions.DependencyInjection;
-using Binlog.MCP;
+using System.CommandLine;
 
-Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Verbose()
-    .WriteTo.Debug()
-    .WriteTo.Console(standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
-    .CreateLogger();
+// "mcp" subcommand (or no args for backward compat with MCP hosts) → run the MCP server.
+if (args.Length == 0 || args[0] == "mcp")
+{
+    await RunMcpServer();
+    return 0;
+}
 
-var builder = Host.CreateApplicationBuilder(args);
-builder.Services.AddSerilog();
+// All other invocations → CLI mode.
+CliRunner.RegisterCallbacks();
+var rootCommand = CliCommands.BuildRootCommand();
+return await rootCommand.InvokeAsync(args);
 
-// Register all feature vertical slices using extension methods
-builder.Services.AddMcpServer()
-    .WithStdioServerTransport()
-    .AddBinlogLoading()
-    .AddTargetAnalysis()
-    .AddTaskAnalysis()
-    .AddAnalyzerAnalysis()
-    .AddProjectAnalysis()
-    .AddEvaluationAnalysis()
-    .AddBuildAnalysis()
-    .AddTimelineAnalysis()
-    .AddDiagnosticAnalysis()
-    .AddSearchAnalysis();
+static async Task RunMcpServer()
+{
+    Log.Logger = new LoggerConfiguration()
+        .MinimumLevel.Verbose()
+        .WriteTo.Debug()
+        .WriteTo.Console(standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
+        .CreateLogger();
 
-await builder.Build().RunAsync();
+    var builder = Host.CreateApplicationBuilder();
+    builder.Services.AddSerilog();
+
+    builder.Services.AddMcpServer()
+        .WithStdioServerTransport()
+        .AddBinlogLoading()
+        .AddTargetAnalysis()
+        .AddTaskAnalysis()
+        .AddAnalyzerAnalysis()
+        .AddProjectAnalysis()
+        .AddEvaluationAnalysis()
+        .AddBuildAnalysis()
+        .AddTimelineAnalysis()
+        .AddDiagnosticAnalysis()
+        .AddSearchAnalysis();
+
+    await builder.Build().RunAsync();
+}
