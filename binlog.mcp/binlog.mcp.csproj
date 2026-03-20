@@ -39,6 +39,7 @@
     <PackageReference Include="MSBuild.StructuredLogger" />
     <PackageReference Include="Microsoft.Build.Framework" />
     <PackageReference Include="Ionide.KeepAChangelog.Tasks" />
+    <PackageReference Include="System.CommandLine" />
   </ItemGroup>
 
 </Project>

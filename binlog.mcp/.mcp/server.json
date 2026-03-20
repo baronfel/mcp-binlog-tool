@@ -9,7 +9,8 @@
       "identifier": "baronfel.binlog.mcp",
       "version": "0.0.13",
       "transport": {
-        "type": "stdio"
+        "type": "stdio",
+        "args": ["mcp"]
       }
     }
   ],
