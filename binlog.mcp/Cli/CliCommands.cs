@@ -70,7 +70,7 @@ internal static class CliCommands
     static Command BuildLoadCommand()
     {
         var binlogArg = BinlogArg();
-        var cmd = new Command("load", "Load a binlog file and display summary information.");
+        var cmd = new Command("load", "Load a binary log file from a given absolute path.");
         cmd.AddArgument(binlogArg);
         cmd.SetHandler(binlog =>
         {
@@ -84,7 +84,8 @@ internal static class CliCommands
     {
         var binlogArg = BinlogArg();
         var patternOpt = new Option<string?>("--pattern", "Glob pattern to filter files (e.g. '**/*.cs')");
-        var cmd = new Command("list-files", "List source files embedded in the binlog.");
+        var cmd = new Command("list-files",
+            "List all source files from the loaded binary log file, optionally filtering by a path pattern.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(patternOpt);
         cmd.SetHandler((binlog, pattern) =>
@@ -100,7 +101,7 @@ internal static class CliCommands
     {
         var binlogArg = BinlogArg();
         var fileArg = new Argument<string>("file-path", "Absolute path of the file inside the binlog.");
-        var cmd = new Command("get-file", "Get the contents of a source file embedded in the binlog.");
+        var cmd = new Command("get-file", "Get a specific source file from the loaded binary log file.");
         cmd.AddArgument(binlogArg);
         cmd.AddArgument(fileArg);
         cmd.SetHandler((binlog, file) =>
@@ -123,7 +124,8 @@ internal static class CliCommands
         var errorsOnlyOpt = new Option<bool>("--errors-only", "Include only errors (exclude warnings).");
         var warningsOnlyOpt = new Option<bool>("--warnings-only", "Include only warnings (exclude errors).");
         var maxOpt = new Option<int?>("--max", "Maximum number of diagnostics to return.");
-        var cmd = new Command("diagnostics", "Extract errors and warnings from the build log.");
+        var cmd = new Command("diagnostics",
+            "Extract diagnostic information (errors, warnings) from a binlog file with optional filtering.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(errorsOnlyOpt);
         cmd.AddOption(warningsOnlyOpt);
@@ -151,7 +153,46 @@ internal static class CliCommands
             "Search query. Supports $task, $project, $target type filters; " +
             "name=value property matching; under(...) hierarchical filters; and more.");
         var maxOpt = new Option<int>("--max", () => 300, "Maximum number of results to return.");
-        var cmd = new Command("search", "Search the binlog using the Structured Log Viewer query language.");
+        var cmd = new Command("search", """
+            Perform freetext search within a binlog file using the same search capabilities as the MSBuild Structured Log Viewer.
+
+            Query Language Syntax:
+            - Basic text search: Simply type words to find nodes containing that text
+            - Exact match: Use quotes "exact phrase" for exact string matching
+            - Multiple terms: Space-separated terms are AND'd together (all must match)
+
+            Node Type Filtering:
+            - $<type>: Filter by node type (e.g., $project, $target, $task, $csc, $rar)
+            - Shortcuts: $csc expands to "$task csc", $rar expands to "$task ResolveAssemblyReference"
+
+            Property and Field Matching:
+            - name=<value>: Match nodes where the name field equals the value
+            - value=<value>: Match nodes where the value field equals the value
+
+            Hierarchical Search:
+            - under(<query>): Find nodes under/within nodes matching the nested query
+            - notunder(<query>): Exclude nodes under/within nodes matching the nested query
+            - project(<query>): Find nodes within projects matching the nested query
+            - not(<query>): Exclude nodes matching the nested query
+
+            Time-based Filtering:
+            - start<"YYYY-MM-DD HH:mm:ss": Nodes that started before the specified time
+            - start>"YYYY-MM-DD HH:mm:ss": Nodes that started after the specified time
+            - end<"YYYY-MM-DD HH:mm:ss": Nodes that ended before the specified time
+            - end>"YYYY-MM-DD HH:mm:ss": Nodes that ended after the specified time
+
+            Special Properties:
+            - skipped=true/false: For targets, filter by whether they were skipped
+            - height=<number> or height=max: Filter by tree height/depth
+
+            Node Index Search:
+            - $<number>: Find node by its unique index (e.g., $123)
+
+            Result Enhancement:
+            - $time or $duration: Include timing information in results
+            - $start or $starttime: Include start time in results
+            - $end or $endtime: Include end time in results
+            """);
         cmd.AddArgument(binlogArg);
         cmd.AddArgument(queryArg);
         cmd.AddOption(maxOpt);
@@ -169,7 +210,7 @@ internal static class CliCommands
     static Command BuildListProjectsCommand()
     {
         var binlogArg = BinlogArg();
-        var cmd = new Command("list-projects", "List all projects in the build log with their entry targets.");
+        var cmd = new Command("list-projects", "List all projects in the loaded binary log file.");
         cmd.AddArgument(binlogArg);
         cmd.SetHandler(binlog =>
         {
@@ -188,7 +229,7 @@ internal static class CliCommands
         { AllowMultipleArgumentsPerToken = true };
         var inclusiveOpt = new Option<bool>("--sort-by-inclusive", "Sort by inclusive time instead of exclusive time.");
         var cmd = new Command("expensive-projects",
-            "Show the most time-consuming projects, ordered by exclusive build time.");
+            "Get the N most expensive projects in the loaded binary log file, aggregated at the project level with options to exclude specific targets and show exclusive vs inclusive time.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(topOpt);
         cmd.AddOption(excludeOpt);
@@ -210,7 +251,7 @@ internal static class CliCommands
             "Target names to exclude from time calculations.")
         { AllowMultipleArgumentsPerToken = true };
         var cmd = new Command("project-build-time",
-            "Get inclusive and exclusive build time for a specific project.");
+            "Get the total build time for a specific project, calculating exclusive time across all its targets with optional filtering to exclude specific targets.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(projectIdOpt);
         cmd.AddOption(excludeOpt);
@@ -227,7 +268,7 @@ internal static class CliCommands
         var binlogArg = BinlogArg();
         var projectIdOpt = RequiredIntOption("--project-id", "ID of the project (from list-projects).");
         var cmd = new Command("project-target-list",
-            "List all targets executed for a specific project.");
+            "Get a list of targets for a specific project in the loaded binary log file. This includes the target's name, ID, and duration.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(projectIdOpt);
         cmd.SetHandler((binlog, projectId) =>
@@ -243,7 +284,7 @@ internal static class CliCommands
         var binlogArg = BinlogArg();
         var projectIdOpt = RequiredIntOption("--project-id", "ID of the project (from list-projects).");
         var cmd = new Command("project-target-times",
-            "Get inclusive and exclusive execution time for every target in a project.");
+            "Get all target execution times for a specific project in one call, including both inclusive and exclusive durations.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(projectIdOpt);
         cmd.SetHandler((binlog, projectId) =>
@@ -261,7 +302,7 @@ internal static class CliCommands
         var binlogArg = BinlogArg();
         var topOpt = new Option<int?>("--top", "Number of targets to return (default: all).");
         var cmd = new Command("expensive-targets",
-            "Show the most time-consuming targets across the entire build, aggregated by name.");
+            "Get the N most expensive targets in the loaded binary log file.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(topOpt);
         cmd.SetHandler((binlog, top) =>
@@ -278,7 +319,7 @@ internal static class CliCommands
         var nameArg = new Argument<string>("target-name",
             "Target name to search for across all projects (case-insensitive).");
         var cmd = new Command("search-targets",
-            "Find all executions of a target by name across all projects.");
+            "Find all executions of a specific target across all projects (e.g., 'CoreCompile') and return their timing information.");
         cmd.AddArgument(binlogArg);
         cmd.AddArgument(nameArg);
         cmd.SetHandler((binlog, name) =>
@@ -298,7 +339,7 @@ internal static class CliCommands
         var targetIdOpt = new Option<int?>("--target-id",
             "ID of the target to look up. More efficient than --target-name.");
         var cmd = new Command("target-info",
-            "Get details about a specific target: duration, success, skip status, and build reason.");
+            "Get some details about a specific target called in a project within the loaded binary log file. This includes the target's duration, its ID, why it was built, etc. Provide --target-name or --target-id.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(projectIdOpt);
         cmd.AddOption(targetNameOpt);
@@ -329,7 +370,7 @@ internal static class CliCommands
         var binlogArg = BinlogArg();
         var topOpt = new Option<int?>("--top", "Number of tasks to return (default: all).");
         var cmd = new Command("expensive-tasks",
-            "Show the most time-consuming MSBuild tasks across the build, aggregated by name.");
+            "Get the N most expensive MSBuild tasks in the loaded binary log file, aggregated by task name.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(topOpt);
         cmd.SetHandler((binlog, top) =>
@@ -347,7 +388,7 @@ internal static class CliCommands
         var targetIdOpt = RequiredIntOption("--target-id", "ID of the target containing the task.");
         var taskIdOpt = RequiredIntOption("--task-id", "ID of the task.");
         var cmd = new Command("task-info",
-            "Get detailed information about a specific task invocation: parameters and messages.");
+            "Get detailed information about a specific MSBuild task invocation, including parameters and messages.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(projectIdOpt);
         cmd.AddOption(targetIdOpt);
@@ -366,7 +407,7 @@ internal static class CliCommands
         var projectIdOpt = RequiredIntOption("--project-id", "ID of the project.");
         var targetIdOpt = RequiredIntOption("--target-id", "ID of the target to list tasks for.");
         var cmd = new Command("list-tasks",
-            "List all task invocations within a target, ordered by ID.");
+            "List all MSBuild task invocations within a specific target, ordered by duration.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(projectIdOpt);
         cmd.AddOption(targetIdOpt);
@@ -384,7 +425,7 @@ internal static class CliCommands
         var nameArg = new Argument<string>("task-name",
             "Task name to search for across all projects (case-insensitive, e.g. 'Csc', 'Copy').");
         var cmd = new Command("search-tasks",
-            "Find all invocations of a task by name across all projects.");
+            "Find all invocations of a specific MSBuild task across all projects (e.g., 'Csc', 'Copy') and return execution summary. Returns a dictionary of dictionaries — the outer keyed by project id, the inner keyed by task id.");
         cmd.AddArgument(binlogArg);
         cmd.AddArgument(nameArg);
         cmd.SetHandler((binlog, name) =>
@@ -402,7 +443,7 @@ internal static class CliCommands
         var binlogArg = BinlogArg();
         var topOpt = new Option<int?>("--top", "Number of analyzers to return (default: all).");
         var cmd = new Command("expensive-analyzers",
-            "Show the most time-consuming Roslyn analyzers and source generators across the build.");
+            "Get the N most expensive Roslyn analyzers and source generators across the entire build, aggregated by analyzer name.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(topOpt);
         cmd.SetHandler((binlog, top) =>
@@ -420,7 +461,7 @@ internal static class CliCommands
         var targetIdOpt = RequiredIntOption("--target-id", "ID of the target containing the Csc task.");
         var taskIdOpt = RequiredIntOption("--task-id", "ID of the Csc task to inspect.");
         var cmd = new Command("task-analyzers",
-            "Extract Roslyn analyzer and source generator timings from a specific Csc task.");
+            "Extract Roslyn analyzer and source generator execution data from a specific Csc task invocation.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(projectIdOpt);
         cmd.AddOption(targetIdOpt);
@@ -442,7 +483,7 @@ internal static class CliCommands
             "Path to the project file to list evaluations for (from list-projects).")
         { IsRequired = true };
         var cmd = new Command("list-evaluations",
-            "List all evaluations for a project. Multiple evaluations may indicate overbuilding.");
+            "List all evaluations for a specific project in the loaded binary log file. You can use the list-projects command to find the project file paths. Multiple evaluations may indicate overbuilding.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(projectFileOpt);
         cmd.SetHandler((binlog, projectFile) =>
@@ -458,7 +499,7 @@ internal static class CliCommands
         var binlogArg = BinlogArg();
         var evalIdOpt = RequiredIntOption("--eval-id", "Evaluation ID (from list-evaluations).");
         var cmd = new Command("eval-global-props",
-            "Show the global properties for an evaluation. Global properties distinguish evaluations of the same project.");
+            "Get the global properties for a specific evaluation in the loaded binary log file. You can use the list-evaluations command to find the evaluation IDs. Global properties are what make evaluations distinct from one another within the same project.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(evalIdOpt);
         cmd.SetHandler((binlog, evalId) =>
@@ -477,7 +518,7 @@ internal static class CliCommands
             "Property names to retrieve. Returns all properties if omitted.")
         { AllowMultipleArgumentsPerToken = true };
         var cmd = new Command("eval-properties",
-            "Get properties (global and non-global) for a project evaluation.");
+            "Get specific properties by name for a project evaluation in the loaded binary log file. You can use the list-evaluations command to find the evaluation IDs. This returns all properties (both global and non-global) matching the requested names.");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(evalIdOpt);
         cmd.AddOption(namesOpt);
@@ -499,7 +540,7 @@ internal static class CliCommands
         { AllowMultipleArgumentsPerToken = true };
         var maxOpt = new Option<int?>("--max", "Maximum items to return per item type (default: 100).");
         var cmd = new Command("eval-items",
-            "Get items (Compile, PackageReference, etc.) for a project evaluation.");
+            "Get specific items by type name for a project evaluation in the loaded binary log file. You can use the list-evaluations command to find the evaluation IDs. Returns items organized by item type (e.g., 'Compile', 'PackageReference', 'Reference').");
         cmd.AddArgument(binlogArg);
         cmd.AddOption(evalIdOpt);
         cmd.AddOption(typesOpt);
@@ -519,7 +560,7 @@ internal static class CliCommands
     {
         var binlogArg = BinlogArg();
         var cmd = new Command("timeline",
-            "Show how much work each MSBuild build node performed (active vs idle time).");
+            "Get data about how much work specific build nodes did in a build.");
         cmd.AddArgument(binlogArg);
         cmd.SetHandler(binlog =>
         {
