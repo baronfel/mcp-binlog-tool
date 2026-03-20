@@ -8,6 +8,9 @@ using Binlog.MCP.Features.SearchAnalysis;
 using Binlog.MCP.Features.TargetAnalysis;
 using Binlog.MCP.Features.TaskAnalysis;
 using Binlog.MCP.Features.TimelineAnalysis;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Serilog;
 
 namespace Binlog.MCP.Cli;
 
@@ -153,46 +156,37 @@ internal static class CliCommands
             "Search query. Supports $task, $project, $target type filters; " +
             "name=value property matching; under(...) hierarchical filters; and more.");
         var maxOpt = new Option<int>("--max", () => 300, "Maximum number of results to return.");
-        var cmd = new Command("search", """
-            Perform freetext search within a binlog file using the same search capabilities as the MSBuild Structured Log Viewer.
-
-            Query Language Syntax:
-            - Basic text search: Simply type words to find nodes containing that text
-            - Exact match: Use quotes "exact phrase" for exact string matching
-            - Multiple terms: Space-separated terms are AND'd together (all must match)
-
-            Node Type Filtering:
-            - $<type>: Filter by node type (e.g., $project, $target, $task, $csc, $rar)
-            - Shortcuts: $csc expands to "$task csc", $rar expands to "$task ResolveAssemblyReference"
-
-            Property and Field Matching:
-            - name=<value>: Match nodes where the name field equals the value
-            - value=<value>: Match nodes where the value field equals the value
-
-            Hierarchical Search:
-            - under(<query>): Find nodes under/within nodes matching the nested query
-            - notunder(<query>): Exclude nodes under/within nodes matching the nested query
-            - project(<query>): Find nodes within projects matching the nested query
-            - not(<query>): Exclude nodes matching the nested query
-
-            Time-based Filtering:
-            - start<"YYYY-MM-DD HH:mm:ss": Nodes that started before the specified time
-            - start>"YYYY-MM-DD HH:mm:ss": Nodes that started after the specified time
-            - end<"YYYY-MM-DD HH:mm:ss": Nodes that ended before the specified time
-            - end>"YYYY-MM-DD HH:mm:ss": Nodes that ended after the specified time
-
-            Special Properties:
-            - skipped=true/false: For targets, filter by whether they were skipped
-            - height=<number> or height=max: Filter by tree height/depth
-
-            Node Index Search:
-            - $<number>: Find node by its unique index (e.g., $123)
-
-            Result Enhancement:
-            - $time or $duration: Include timing information in results
-            - $start or $starttime: Include start time in results
-            - $end or $endtime: Include end time in results
-            """);
+        var cmd = new Command("search",
+            "Perform freetext search within a binlog file using the same search capabilities as the MSBuild Structured Log Viewer.\n\n" +
+            "Query Language Syntax:\n" +
+            "- Basic text search: Simply type words to find nodes containing that text\n" +
+            "- Exact match: Use quotes \"exact phrase\" for exact string matching\n" +
+            "- Multiple terms: Space-separated terms are AND'd together (all must match)\n\n" +
+            "Node Type Filtering:\n" +
+            "- $<type>: Filter by node type (e.g., $project, $target, $task, $csc, $rar)\n" +
+            "- Shortcuts: $csc expands to \"$task csc\", $rar expands to \"$task ResolveAssemblyReference\"\n\n" +
+            "Property and Field Matching:\n" +
+            "- name=<value>: Match nodes where the name field equals the value\n" +
+            "- value=<value>: Match nodes where the value field equals the value\n\n" +
+            "Hierarchical Search:\n" +
+            "- under(<query>): Find nodes under/within nodes matching the nested query\n" +
+            "- notunder(<query>): Exclude nodes under/within nodes matching the nested query\n" +
+            "- project(<query>): Find nodes within projects matching the nested query\n" +
+            "- not(<query>): Exclude nodes matching the nested query\n\n" +
+            "Time-based Filtering:\n" +
+            "- start<\"YYYY-MM-DD HH:mm:ss\": Nodes that started before the specified time\n" +
+            "- start>\"YYYY-MM-DD HH:mm:ss\": Nodes that started after the specified time\n" +
+            "- end<\"YYYY-MM-DD HH:mm:ss\": Nodes that ended before the specified time\n" +
+            "- end>\"YYYY-MM-DD HH:mm:ss\": Nodes that ended after the specified time\n\n" +
+            "Special Properties:\n" +
+            "- skipped=true/false: For targets, filter by whether they were skipped\n" +
+            "- height=<number> or height=max: Filter by tree height/depth\n\n" +
+            "Node Index Search:\n" +
+            "- $<number>: Find node by its unique index (e.g., $123)\n\n" +
+            "Result Enhancement:\n" +
+            "- $time or $duration: Include timing information in results\n" +
+            "- $start or $starttime: Include start time in results\n" +
+            "- $end or $endtime: Include end time in results");
         cmd.AddArgument(binlogArg);
         cmd.AddArgument(queryArg);
         cmd.AddOption(maxOpt);
@@ -574,8 +568,35 @@ internal static class CliCommands
 
     static Command BuildMcpCommand()
     {
-        return new Command("mcp",
+        var cmd = new Command("mcp",
             "Start the MCP server for use with MCP-compatible AI assistants (e.g. GitHub Copilot, Claude).");
+        cmd.SetHandler(async () =>
+        {
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Verbose()
+                .WriteTo.Debug()
+                .WriteTo.Console(standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
+                .CreateLogger();
+
+            var builder = Host.CreateApplicationBuilder();
+            builder.Services.AddSerilog();
+
+            builder.Services.AddMcpServer()
+                .WithStdioServerTransport()
+                .AddBinlogLoading()
+                .AddTargetAnalysis()
+                .AddTaskAnalysis()
+                .AddAnalyzerAnalysis()
+                .AddProjectAnalysis()
+                .AddEvaluationAnalysis()
+                .AddBuildAnalysis()
+                .AddTimelineAnalysis()
+                .AddDiagnosticAnalysis()
+                .AddSearchAnalysis();
+
+            await builder.Build().RunAsync();
+        });
+        return cmd;
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
