@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <PublishTrimmed>true</PublishTrimmed>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol" />
