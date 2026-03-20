@@ -45,8 +45,9 @@ internal static class CliRunner
     }
 
     /// <summary>
-    /// Serializes a value to indented JSON and writes it to stdout.
-    /// Uses the source-generated <see cref="BinlogJsonContext"/> for trim-safe serialization.
+    /// Serializes <paramref name="value"/> as compact JSON to stdout using the same
+    /// source-generated <see cref="BinlogJsonContext"/> that the MCP server uses.
+    /// Compact output is intentional — the primary consumers are agents, not humans.
     /// </summary>
     public static void PrintJson<T>(T value)
     {
@@ -54,15 +55,7 @@ internal static class CliRunner
             ?? throw new InvalidOperationException(
                 $"Type {typeof(T).Name} is not registered in BinlogJsonContext.");
 
-        // Serialize through the source-generated context (trim-safe), then pretty-print via
-        // JsonDocument so we avoid a second reflection-based Serialize call.
-        var compact = JsonSerializer.Serialize(value, typeInfo);
-        using var doc = JsonDocument.Parse(compact);
-        using var writer = new Utf8JsonWriter(Console.OpenStandardOutput(),
-            new JsonWriterOptions { Indented = true });
-        doc.RootElement.WriteTo(writer);
-        writer.Flush();
-        Console.WriteLine();
+        Console.WriteLine(JsonSerializer.Serialize(value, typeInfo));
     }
 
     private sealed class ConsoleProgress : IProgress<ProgressNotificationValue>
