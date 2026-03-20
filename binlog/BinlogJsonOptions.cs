@@ -7,7 +7,7 @@ namespace Binlog.MCP;
 /// Provides JSON serialization options configured for the binlog MCP server.
 /// Chains the custom binlog types with the MCP library's default JsonTypeInfo.
 /// </summary>
-internal static class BinlogJsonOptions
+public static class BinlogJsonOptions
 {
     /// <summary>
     /// Gets the JSON serializer options that chain our custom types with the MCP library's default types.

@@ -83,6 +83,6 @@ namespace Binlog.MCP;
 [JsonSerializable(typeof(SearchAnalysisResult))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(string[]))]
-internal partial class BinlogJsonContext : JsonSerializerContext
+public partial class BinlogJsonContext : JsonSerializerContext
 {
 }

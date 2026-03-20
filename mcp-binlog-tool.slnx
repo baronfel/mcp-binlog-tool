@@ -4,5 +4,7 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Project Path="binlog/binlog.csproj" />
   <Project Path="binlog.mcp/binlog.mcp.csproj" />
+  <Project Path="binlog.cli/binlog.cli.csproj" />
 </Solution>

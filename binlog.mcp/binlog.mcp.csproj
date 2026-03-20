@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -36,10 +36,11 @@
     <PackageReference Include="Serilog.Sinks.Debug" />
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
-    <PackageReference Include="MSBuild.StructuredLogger" />
-    <PackageReference Include="Microsoft.Build.Framework" />
     <PackageReference Include="Ionide.KeepAChangelog.Tasks" />
-    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../binlog/binlog.csproj" />
   </ItemGroup>
 
 </Project>
