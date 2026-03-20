@@ -41,7 +41,7 @@ jobs:
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: artifacts/package/release/baronfel.binlog.mcp.${{ steps.tag_name.outputs.current_version }}.nupkg
+          artifacts: artifacts/package/release/baronfel.binlog.*.nupkg
           token: ${{ secrets.GITHUB_TOKEN }}
           body: ${{ steps.changelog_reader.outputs.changes }}
 
@@ -53,4 +53,4 @@ jobs:
           user: ${{secrets.NUGET_USER}}
 
       - name: Push packages
-        run: dotnet nuget push artifacts/package/release/baronfel.binlog.mcp.${{ steps.tag_name.outputs.current_version }}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{steps.login.outputs.NUGET_API_KEY}}
+        run: dotnet nuget push "artifacts/package/release/baronfel.binlog.*.nupkg" --source https://api.nuget.org/v3/index.json --api-key ${{steps.login.outputs.NUGET_API_KEY}}

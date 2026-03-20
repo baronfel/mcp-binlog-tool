@@ -6,16 +6,30 @@
     <Nullable>enable</Nullable>
     <PublishSingleFile>true</PublishSingleFile>
     <PublishTrimmed>true</PublishTrimmed>
+
+    <!-- .NET SDK tool package properties -->
     <PackAsTool>true</PackAsTool>
+    <ToolCommandName>binlog</ToolCommandName>
     <PackageId>baronfel.binlog.cli</PackageId>
     <Description>A CLI tool for analyzing and investigating MSBuild binlogs.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Authors>Chet Husk</Authors>
     <PackageTags>msbuild;binlog;cli</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <ChangelogFile>CHANGELOG.md</ChangelogFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="PACKAGE_README.md" Pack="true" PackagePath="/README.md" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Ionide.KeepAChangelog.Tasks" />
   </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../binlog/binlog.csproj" />
   </ItemGroup>
