@@ -8,9 +8,6 @@ using Binlog.MCP.Features.SearchAnalysis;
 using Binlog.MCP.Features.TargetAnalysis;
 using Binlog.MCP.Features.TaskAnalysis;
 using Binlog.MCP.Features.TimelineAnalysis;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Serilog;
 
 namespace Binlog.MCP.Cli;
 
@@ -61,9 +58,6 @@ internal static class CliCommands
 
         // Timeline
         root.AddCommand(BuildTimelineCommand());
-
-        // MCP server (see Program.cs for dispatch)
-        root.AddCommand(BuildMcpCommand());
 
         return root;
     }
@@ -561,41 +555,6 @@ internal static class CliCommands
             CliRunner.EnsureLoaded(binlog);
             CliRunner.PrintJson(GetNodeTimelineTool.GetNodeTimelineInfo(binlog));
         }, binlogArg);
-        return cmd;
-    }
-
-    // ─── MCP server placeholder (dispatched in Program.cs) ───────────────────
-
-    static Command BuildMcpCommand()
-    {
-        var cmd = new Command("mcp",
-            "Start the MCP server for use with MCP-compatible AI assistants (e.g. GitHub Copilot, Claude).");
-        cmd.SetHandler(async () =>
-        {
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Verbose()
-                .WriteTo.Debug()
-                .WriteTo.Console(standardErrorFromLevel: Serilog.Events.LogEventLevel.Verbose)
-                .CreateLogger();
-
-            var builder = Host.CreateApplicationBuilder();
-            builder.Services.AddSerilog();
-
-            builder.Services.AddMcpServer()
-                .WithStdioServerTransport()
-                .AddBinlogLoading()
-                .AddTargetAnalysis()
-                .AddTaskAnalysis()
-                .AddAnalyzerAnalysis()
-                .AddProjectAnalysis()
-                .AddEvaluationAnalysis()
-                .AddBuildAnalysis()
-                .AddTimelineAnalysis()
-                .AddDiagnosticAnalysis()
-                .AddSearchAnalysis();
-
-            await builder.Build().RunAsync();
-        });
         return cmd;
     }
 
