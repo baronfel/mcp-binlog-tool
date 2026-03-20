@@ -33,10 +33,9 @@ public class Timeline
     }
 
     /// <summary>
-    /// Gets the collection of timed nodes grouped by their node ID.
-    /// Each node ID maps to a set of interesting data about that node.
+    /// Gets the work statistics for each build node, keyed by MSBuild node ID.
     /// </summary>
-    public ConcurrentDictionary<int, NodeStats> NodesByNodeId = new();
+    public Dictionary<int, NodeStats> NodesByNodeId { get; private set; } = [];
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Timeline"/> class.
@@ -50,28 +49,24 @@ public class Timeline
     private void Populate(Build build)
     {
         var buildDurationMs = (int)(build.EndTime - build.StartTime).TotalMilliseconds;
+        // ConcurrentDictionary for thread-safe parallel population; converted to Dictionary after.
+        var concurrent = new ConcurrentDictionary<int, NodeStats>();
         build.ParallelVisitAllChildren<TimedNode>(node =>
         {
             if (node is not TimedNode timedNode)
-            {
                 return;
-            }
 
             if (timedNode is Build)
-            {
                 return;
-            }
 
             if (timedNode is Microsoft.Build.Logging.StructuredLogger.Task task &&
                 (string.Equals(task.Name, "MSBuild", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(task.Name, "CallTarget", StringComparison.OrdinalIgnoreCase)))
-            {
                 return;
-            }
 
-            var nodeId = timedNode.NodeId;
-            var nodeStats = NodesByNodeId.GetOrAdd(nodeId, (_) => new(buildDurationMs));
+            var nodeStats = concurrent.GetOrAdd(timedNode.NodeId, _ => new(buildDurationMs));
             nodeStats.Track(timedNode);
         });
+        NodesByNodeId = new Dictionary<int, NodeStats>(concurrent);
     }
 }
