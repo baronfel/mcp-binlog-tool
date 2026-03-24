@@ -15,7 +15,9 @@ internal static class CliCommands
 {
     public static RootCommand BuildRootCommand()
     {
-        var root = new RootCommand("MSBuild binlog analysis and investigation tool.");
+        var root = new RootCommand(
+            "MSBuild binlog analysis and investigation tool. " +
+            "Use 'batch' for multi-command sessions to avoid re-parsing the binlog on each invocation.");
 
         // Binlog loading
         root.AddCommand(BuildLoadCommand());
@@ -106,7 +108,8 @@ internal static class CliCommands
     {
         var binlogArg = BinlogArg();
         var cmd = new Command("batch",
-            "Load a binlog once and run multiple commands interactively. " +
+            "Load a binlog once and run multiple commands without re-parsing. " +
+            "Optimized for multi-command sessions — avoids the per-command binlog load overhead. " +
             "Reads commands from stdin, one per line. Each command is the same as a normal CLI invocation " +
             "but without the binlog path (it is injected automatically). " +
             "Responds with one JSON object per line on stdout. " +
