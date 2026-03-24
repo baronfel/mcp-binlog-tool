@@ -59,7 +59,135 @@ internal static class CliCommands
         // Timeline
         root.AddCommand(BuildTimelineCommand());
 
+        // Batch mode
+        root.AddCommand(BuildBatchCommand());
+
         return root;
+    }
+
+    // ─── Batch mode ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Builds a root command for use inside batch mode — all analysis commands but no batch command.
+    /// </summary>
+    static RootCommand BuildBatchRootCommand()
+    {
+        var root = new RootCommand("MSBuild binlog analysis and investigation tool.");
+
+        root.AddCommand(BuildLoadCommand());
+        root.AddCommand(BuildListFilesCommand());
+        root.AddCommand(BuildGetFileCommand());
+        root.AddCommand(BuildDiagnosticsCommand());
+        root.AddCommand(BuildSearchCommand());
+        root.AddCommand(BuildListProjectsCommand());
+        root.AddCommand(BuildExpensiveProjectsCommand());
+        root.AddCommand(BuildProjectBuildTimeCommand());
+        root.AddCommand(BuildProjectTargetListCommand());
+        root.AddCommand(BuildProjectTargetTimesCommand());
+        root.AddCommand(BuildExpensiveTargetsCommand());
+        root.AddCommand(BuildSearchTargetsCommand());
+        root.AddCommand(BuildTargetInfoCommand());
+        root.AddCommand(BuildExpensiveTasksCommand());
+        root.AddCommand(BuildTaskInfoCommand());
+        root.AddCommand(BuildListTasksCommand());
+        root.AddCommand(BuildSearchTasksCommand());
+        root.AddCommand(BuildExpensiveAnalyzersCommand());
+        root.AddCommand(BuildTaskAnalyzersCommand());
+        root.AddCommand(BuildListEvaluationsCommand());
+        root.AddCommand(BuildEvalGlobalPropsCommand());
+        root.AddCommand(BuildEvalPropertiesCommand());
+        root.AddCommand(BuildEvalItemsCommand());
+        root.AddCommand(BuildTimelineCommand());
+
+        return root;
+    }
+
+    static Command BuildBatchCommand()
+    {
+        var binlogArg = BinlogArg();
+        var cmd = new Command("batch",
+            "Load a binlog once and run multiple commands interactively. " +
+            "Reads commands from stdin, one per line. Each command is the same as a normal CLI invocation " +
+            "but without the binlog path (it is injected automatically). " +
+            "Responds with one JSON object per line on stdout. " +
+            "Send 'exit' or close stdin to quit.");
+        cmd.AddArgument(binlogArg);
+        cmd.SetHandler(async binlog =>
+        {
+            CliRunner.EnsureLoaded(binlog);
+
+            // Build a separate root command for dispatching batch input (without the batch command itself)
+            var batchRoot = BuildBatchRootCommand();
+
+            Console.Error.WriteLine("ready");
+
+            while (Console.ReadLine() is { } line)
+            {
+                line = line.Trim();
+                if (line is "" or "exit" or "quit")
+                {
+                    if (line is "exit" or "quit") break;
+                    continue;
+                }
+
+                // Inject the binlog path after the command name.
+                // Input: "expensive-projects --top 5"
+                // We need: "expensive-projects <binlog> --top 5"
+                var parts = SplitCommandLine(line);
+                var commandName = parts[0];
+                var rest = parts.Skip(1).ToArray();
+
+                var invokeArgs = new List<string> { commandName, binlog };
+                invokeArgs.AddRange(rest);
+
+                await batchRoot.InvokeAsync(invokeArgs.ToArray());
+            }
+        }, binlogArg);
+        return cmd;
+    }
+
+    /// <summary>
+    /// Splits a command line string into tokens, respecting quoted strings.
+    /// </summary>
+    static List<string> SplitCommandLine(string line)
+    {
+        var tokens = new List<string>();
+        var current = new System.Text.StringBuilder();
+        bool inQuote = false;
+        char quoteChar = '"';
+
+        foreach (char c in line)
+        {
+            if (inQuote)
+            {
+                if (c == quoteChar)
+                    inQuote = false;
+                else
+                    current.Append(c);
+            }
+            else if (c is '"' or '\'')
+            {
+                inQuote = true;
+                quoteChar = c;
+            }
+            else if (char.IsWhiteSpace(c))
+            {
+                if (current.Length > 0)
+                {
+                    tokens.Add(current.ToString());
+                    current.Clear();
+                }
+            }
+            else
+            {
+                current.Append(c);
+            }
+        }
+
+        if (current.Length > 0)
+            tokens.Add(current.ToString());
+
+        return tokens;
     }
 
     // ─── Binlog loading ──────────────────────────────────────────────────────
