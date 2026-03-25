@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## [0.0.1] - 2026-03-20
+## [0.0.14] - 2026-03-25
 
 ### Added
 
@@ -18,3 +18,4 @@
   - `list-evaluations`, `eval-global-props`, `eval-properties`, `eval-items` — evaluation analysis
   - `timeline` — build timeline and parallelization analysis
   - `search` — full MSBuild Structured Log Viewer query syntax
+- `batch` mode for multi-command sessions — loads binlog once, reads commands from stdin

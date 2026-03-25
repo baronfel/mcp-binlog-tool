@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.0.14] - 2026-03-25
+
+### Added
+
+- Extracted shared analysis library (`binlog`) so MCP server and CLI share the same implementation
+- New `binlog.cli` package (`baronfel.binlog.cli`) providing all analysis tools as CLI subcommands
+
+### Fixed
+
+- Fixed `Timeline.NodesByNodeId` serialization: `ConcurrentDictionary` field was silently skipped by STJ source gen, now uses `Dictionary` property
+
 ## [0.0.13] - 2026-02-04
 
 ### Added
