@@ -119,7 +119,6 @@ internal static class CliCommands
         {
             CliRunner.EnsureLoaded(binlog);
 
-            // Build a separate root command for dispatching batch input (without the batch command itself)
             var batchRoot = BuildBatchRootCommand();
 
             Console.Error.WriteLine("ready");
@@ -133,64 +132,11 @@ internal static class CliCommands
                     continue;
                 }
 
-                // Inject the binlog path after the command name.
-                // Input: "expensive-projects --top 5"
-                // We need: "expensive-projects <binlog> --top 5"
-                var parts = SplitCommandLine(line);
-                var commandName = parts[0];
-                var rest = parts.Skip(1).ToArray();
-
-                var invokeArgs = new List<string> { commandName, binlog };
-                invokeArgs.AddRange(rest);
-
-                await batchRoot.InvokeAsync(invokeArgs.ToArray());
+                // Append the binlog path — S.CL handles tokenization and argument positioning.
+                await batchRoot.InvokeAsync($"{line} \"{binlog}\"");
             }
         }, binlogArg);
         return cmd;
-    }
-
-    /// <summary>
-    /// Splits a command line string into tokens, respecting quoted strings.
-    /// </summary>
-    static List<string> SplitCommandLine(string line)
-    {
-        var tokens = new List<string>();
-        var current = new System.Text.StringBuilder();
-        bool inQuote = false;
-        char quoteChar = '"';
-
-        foreach (char c in line)
-        {
-            if (inQuote)
-            {
-                if (c == quoteChar)
-                    inQuote = false;
-                else
-                    current.Append(c);
-            }
-            else if (c is '"' or '\'')
-            {
-                inQuote = true;
-                quoteChar = c;
-            }
-            else if (char.IsWhiteSpace(c))
-            {
-                if (current.Length > 0)
-                {
-                    tokens.Add(current.ToString());
-                    current.Clear();
-                }
-            }
-            else
-            {
-                current.Append(c);
-            }
-        }
-
-        if (current.Length > 0)
-            tokens.Add(current.ToString());
-
-        return tokens;
     }
 
     // ─── Binlog loading ──────────────────────────────────────────────────────
